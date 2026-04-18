@@ -114,6 +114,7 @@ select {
 
 .hero__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 20px;
 }
@@ -167,7 +168,12 @@ select {
 
 .pulse-card {
   width: 100%;
-  padding: 18px 20px 20px;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto auto;
+  gap: 12px;
+  align-content: start;
+  min-height: 100%;
+  padding: 20px 22px 22px;
   border-radius: calc(var(--radius-xl) - 6px);
   color: #fff8f1;
   background:
@@ -189,6 +195,7 @@ select {
 
 .pulse-card__label {
   display: inline-flex;
+  width: fit-content;
   padding: 6px 10px;
   border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.16);
@@ -199,30 +206,36 @@ select {
 
 .pulse-card strong {
   display: block;
-  margin-top: 12px;
-  font-size: 1.38rem;
-  line-height: 1.2;
-  text-wrap: balance;
+  margin: 0;
+  max-width: 11ch;
+  font-size: 1.42rem;
+  line-height: 1.14;
+  text-wrap: pretty;
 }
 
 .pulse-card p {
-  margin: 10px 0 12px;
-  max-width: 28ch;
-  line-height: 1.5;
+  margin: 0;
+  max-width: 24ch;
+  line-height: 1.52;
   text-wrap: pretty;
 }
 
 .pulse-card__meta {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
   font-size: 0.92rem;
   color: rgba(255, 248, 241, 0.86);
 }
 
-.pulse-card__priority {
+.pulse-card__meta > span {
+  min-height: 34px;
   display: inline-flex;
   align-items: center;
+}
+
+.pulse-card__priority {
   padding: 6px 10px;
   border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.14);
@@ -247,17 +260,19 @@ select {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  margin-top: 14px;
+  margin-top: 2px;
 }
 
 .pulse-btn {
-  padding: 11px 15px;
+  min-height: 46px;
+  padding: 11px 16px;
   border: none;
   border-radius: var(--radius-sm);
   background: #fff7f0;
   color: #a33622;
   cursor: pointer;
   font-weight: 700;
+  line-height: 1;
   transition: transform 180ms ease, background 180ms ease, color 180ms ease;
 }
 
@@ -648,6 +663,17 @@ select {
   justify-content: space-between;
   margin-bottom: 16px;
   width: 100%;
+}
+
+.toolbar--board {
+  justify-content: space-between;
+  margin-bottom: 16px;
+  width: 100%;
+}
+
+.toolbar--board .chip-group,
+.toolbar--table .chip-group {
+  justify-content: flex-end;
 }
 
 .toolbar input {

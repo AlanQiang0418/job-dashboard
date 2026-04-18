@@ -289,6 +289,7 @@ const boardView = document.querySelector("#boardView");
 const tableView = document.querySelector("#tableView");
 const addApplicationBtn = document.querySelector("#addApplicationBtn");
 const exportReportBtn = document.querySelector("#exportReportBtn");
+const exportCalendarBtn = document.querySelector("#exportCalendarBtn");
 const refreshRecommendedBtn = document.querySelector("#refreshRecommendedBtn");
 const applicationModal = document.querySelector("#applicationModal");
 const applicationForm = document.querySelector("#applicationForm");
@@ -481,6 +482,186 @@ function downloadFile(filename, content, type = "text/plain;charset=utf-8") {
   URL.revokeObjectURL(url);
 }
 
+function padCalendarNumber(value) {
+  return String(value).padStart(2, "0");
+}
+
+function formatICSDate(date) {
+  return `${date.getFullYear()}${padCalendarNumber(date.getMonth() + 1)}${padCalendarNumber(date.getDate())}`;
+}
+
+function formatICSDateTimeUTC(date) {
+  return `${date.getUTCFullYear()}${padCalendarNumber(date.getUTCMonth() + 1)}${padCalendarNumber(date.getUTCDate())}T${padCalendarNumber(date.getUTCHours())}${padCalendarNumber(date.getUTCMinutes())}${padCalendarNumber(date.getUTCSeconds())}Z`;
+}
+
+function escapeICS(value) {
+  return String(value || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
+}
+
+function parseTimelineDateTime(value) {
+  if (!value || !value.includes(" ")) {
+    return null;
+  }
+
+  const [datePart, timePart] = value.split(" ");
+  const [month, day] = datePart.split("/").map(Number);
+  const [hours, minutes] = timePart.split(":").map(Number);
+
+  if ([month, day, hours, minutes].some((part) => Number.isNaN(part))) {
+    return null;
+  }
+
+  return new Date(new Date().getFullYear(), month - 1, day, hours, minutes, 0, 0);
+}
+
+function getTimelineEventDurationMinutes(entry) {
+  const match = String(entry?.desc || "").match(/(\d+)\s*分钟/);
+  return match ? Number(match[1]) : 60;
+}
+
+function buildCalendarEvent({
+  uid,
+  summary,
+  description,
+  location,
+  startDate,
+  endDate,
+  allDay = false,
+  alarmMinutes = 60
+}) {
+  const lines = [
+    "BEGIN:VEVENT",
+    `UID:${uid}`,
+    `DTSTAMP:${formatICSDateTimeUTC(new Date())}`,
+    `SUMMARY:${escapeICS(summary)}`,
+    `DESCRIPTION:${escapeICS(description)}`
+  ];
+
+  if (location) {
+    lines.push(`LOCATION:${escapeICS(location)}`);
+  }
+
+  if (allDay) {
+    lines.push(`DTSTART;VALUE=DATE:${formatICSDate(startDate)}`);
+    lines.push(`DTEND;VALUE=DATE:${formatICSDate(endDate)}`);
+  } else {
+    lines.push(`DTSTART:${formatICSDateTimeUTC(startDate)}`);
+    lines.push(`DTEND:${formatICSDateTimeUTC(endDate)}`);
+  }
+
+  if (alarmMinutes > 0) {
+    lines.push(
+      "BEGIN:VALARM",
+      `TRIGGER:-PT${alarmMinutes}M`,
+      "ACTION:DISPLAY",
+      `DESCRIPTION:${escapeICS(summary)}`,
+      "END:VALARM"
+    );
+  }
+
+  lines.push("END:VEVENT");
+  return lines.join("\r\n");
+}
+
+function buildCalendarFileContent() {
+  const events = [];
+
+  applications.forEach((item) => {
+    const deadlineDate = getDeadlineDate(item.deadline);
+    if (!deadlineDate || item.badge === "流程终止" || item.badge === "已放弃") {
+      return;
+    }
+
+    const nextDate = new Date(deadlineDate);
+    nextDate.setDate(nextDate.getDate() + 1);
+
+    events.push(
+      buildCalendarEvent({
+        uid: `${item.id}-deadline@campus-job-tracker`,
+        summary: `${item.company}${item.role} 截止日`,
+        description: `${item.stageLabel} / ${item.badge}\n下一步：${item.nextStep}`,
+        location: item.city || "",
+        startDate: deadlineDate,
+        endDate: nextDate,
+        allDay: true,
+        alarmMinutes: 18 * 60
+      })
+    );
+  });
+
+  timelineItems.forEach((entry) => {
+    const item = applications.find((application) => application.id === entry.applicationId);
+    const startDate = parseTimelineDateTime(entry.time);
+    if (!item || !startDate) {
+      return;
+    }
+
+    const endDate = new Date(startDate);
+    endDate.setMinutes(endDate.getMinutes() + getTimelineEventDurationMinutes(entry));
+
+    events.push(
+      buildCalendarEvent({
+        uid: `${entry.applicationId}-${formatICSDateTimeUTC(startDate)}@campus-job-tracker`,
+        summary: `${item.company}${item.role} - ${entry.title}`,
+        description: `${entry.desc}\n联系人：${item.contact || "未填写"}\n下一步：${item.nextStep}`,
+        location: item.city || "",
+        startDate,
+        endDate,
+        allDay: false,
+        alarmMinutes: 60
+      })
+    );
+  });
+
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Campus Job Tracker//Calendar Export//ZH",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "X-WR-CALNAME:求职申请日历",
+    ...events,
+    "END:VCALENDAR"
+  ].join("\r\n");
+}
+
+async function exportCalendar() {
+  const filename = "求职申请日历.ics";
+  const content = buildCalendarFileContent();
+  const file = typeof File === "function"
+    ? new File([content], filename, { type: "text/calendar;charset=utf-8" })
+    : null;
+
+  const canShareFile = Boolean(
+    file &&
+    navigator?.share &&
+    (!navigator.canShare || navigator.canShare({ files: [file] }))
+  );
+
+  if (canShareFile) {
+    try {
+      await navigator.share({
+        title: "求职申请日历",
+        text: "将截止日期和面试安排导入系统日历",
+        files: [file]
+      });
+      showSuccessToast("已调起系统分享，可导入手机日历");
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        return;
+      }
+    }
+  }
+
+  downloadFile(filename, content, "text/calendar;charset=utf-8");
+  showSuccessToast("日历文件已导出，可导入系统日历");
+}
+
 function populateStatusSelect(selectEl, stage, selectedValue = "") {
   const options = badgeOptionsByStage[stage] || [];
   selectEl.innerHTML = "";
@@ -508,6 +689,47 @@ function syncDrawerBadgeOptions(stage, selectedValue = "") {
   populateStatusSelect(drawerBadgeSelect, stage, selectedValue);
 }
 
+function getFilterGroups() {
+  return [...document.querySelectorAll("[data-application-filter-group]")];
+}
+
+function getSearchInputs() {
+  return [...document.querySelectorAll("[data-application-search]")];
+}
+
+function syncSearchInputs(rawValue = "") {
+  getSearchInputs().forEach((input) => {
+    if (input.value !== rawValue) {
+      input.value = rawValue;
+    }
+  });
+}
+
+function ensureBoardFilterGroup() {
+  if (!boardView || !filterGroup || document.querySelector("#boardFilterGroup")) {
+    return;
+  }
+
+  filterGroup.dataset.applicationFilterGroup = "true";
+  searchInput.dataset.applicationSearch = "true";
+
+  const toolbar = document.createElement("div");
+  toolbar.className = "toolbar toolbar--board";
+
+  const boardSearchInput = searchInput.cloneNode(true);
+  boardSearchInput.id = "boardSearchInput";
+  boardSearchInput.dataset.applicationSearch = "true";
+  boardSearchInput.value = searchInput.value;
+
+  const boardFilterGroup = filterGroup.cloneNode(true);
+  boardFilterGroup.id = "boardFilterGroup";
+  boardFilterGroup.dataset.applicationFilterGroup = "true";
+
+  toolbar.appendChild(boardSearchInput);
+  toolbar.appendChild(boardFilterGroup);
+  boardView.prepend(toolbar);
+}
+
 function isThisWeekDeadline(item) {
   const date = getDeadlineDate(item.deadline);
   if (!date) {
@@ -524,50 +746,65 @@ function isThisWeekDeadline(item) {
 }
 
 function ensureWeekFilterChip() {
-  if (!filterGroup || filterGroup.querySelector('[data-filter="week"]')) {
+  if (!filterGroup) {
     return;
   }
 
-  const weekChip = document.createElement("button");
-  weekChip.className = "chip";
-  weekChip.type = "button";
-  weekChip.dataset.filter = "week";
-  weekChip.textContent = "本周截止";
+  getFilterGroups().forEach((group) => {
+    if (group.querySelector('[data-filter="week"]')) {
+      return;
+    }
 
-  const allChip = filterGroup.querySelector('[data-filter="all"]');
-  if (allChip?.nextSibling) {
-    filterGroup.insertBefore(weekChip, allChip.nextSibling);
-  } else {
-    filterGroup.appendChild(weekChip);
+    const weekChip = document.createElement("button");
+    weekChip.className = "chip";
+    weekChip.type = "button";
+    weekChip.dataset.filter = "week";
+    weekChip.textContent = "本周截止";
+
+    const allChip = group.querySelector('[data-filter="all"]');
+    if (allChip?.nextSibling) {
+      group.insertBefore(weekChip, allChip.nextSibling);
+    } else {
+      group.appendChild(weekChip);
+    }
+  });
+}
+
+function matchesActiveFilter(item) {
+  return activeFilter === "all" || (activeFilter === "week" ? isThisWeekDeadline(item) : item.stage === activeFilter);
+}
+
+function matchesKeyword(item) {
+  if (!keyword) {
+    return true;
   }
+
+  const haystack = `${item.company} ${item.role} ${item.city}`.toLowerCase();
+  return haystack.includes(keyword);
+}
+
+function getVisibleItems(items) {
+  return items.filter((item) => matchesActiveFilter(item) && matchesKeyword(item));
+}
+
+function applyActiveFilter(filter) {
+  activeFilter = filter;
+  renderBoard(applications);
+  renderTable(applications);
+  syncFilterUI();
 }
 
 function openTableViewWithFilter(filter) {
+  ensureBoardFilterGroup();
   ensureWeekFilterChip();
   activeView = "table";
-  activeFilter = filter;
-  renderTable(applications);
-  syncFilterUI();
+  applyActiveFilter(filter);
   syncView();
   applicationBoardPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function getFilteredTableItems(items) {
-  return items.filter((item) => {
-    const matchesFilter =
-      activeFilter === "all" ||
-      (activeFilter === "week" ? isThisWeekDeadline(item) : item.stage === activeFilter);
-    if (!matchesFilter) {
-      return false;
-    }
-
-    if (!keyword) {
-      return true;
-    }
-
-    const haystack = `${item.company} ${item.role} ${item.city}`.toLowerCase();
-    return haystack.includes(keyword);
-  });
+  return getVisibleItems(items);
 }
 
 function getSortedTableItems(items) {
@@ -605,8 +842,10 @@ function syncTableSortUI() {
 }
 
 function syncFilterUI() {
-  [...filterGroup.querySelectorAll(".chip")].forEach((chip) => {
-    chip.classList.toggle("active", chip.dataset.filter === activeFilter);
+  getFilterGroups().forEach((group) => {
+    [...group.querySelectorAll(".chip")].forEach((chip) => {
+      chip.classList.toggle("active", chip.dataset.filter === activeFilter);
+    });
   });
 }
 
@@ -790,9 +1029,10 @@ function renderTaskCenter(items) {
 
 function renderBoard(items) {
   board.innerHTML = "";
+  const filteredItems = getVisibleItems(items);
 
   boardColumns.forEach((column) => {
-    const columnItems = items.filter((item) => item.stage === column.id);
+    const columnItems = filteredItems.filter((item) => item.stage === column.id);
     const section = document.createElement("section");
     section.className = "board-column fade-in";
     section.innerHTML = `
@@ -1155,6 +1395,9 @@ applicationForm.addEventListener("submit", (event) => {
 });
 
 exportReportBtn.addEventListener("click", exportWeeklyReport);
+exportCalendarBtn?.addEventListener("click", () => {
+  exportCalendar();
+});
 
 focusUrgentBtn.addEventListener("click", () => {
   const urgentItem = getUrgentApplication(applications);
@@ -1375,19 +1618,24 @@ detailsDrawer.addEventListener("close", () => {
   syncDrawerMode();
 });
 
-searchInput.addEventListener("input", (event) => {
-  keyword = event.target.value.trim().toLowerCase();
-  renderTable(applications);
-});
-
-filterGroup.addEventListener("click", (event) => {
+applicationBoardPanel.addEventListener("click", (event) => {
   const chip = event.target.closest("[data-filter]");
-  if (!chip) {
+  if (!chip || !chip.closest("[data-application-filter-group]")) {
     return;
   }
-  activeFilter = chip.dataset.filter;
+  applyActiveFilter(chip.dataset.filter);
+});
+
+applicationBoardPanel.addEventListener("input", (event) => {
+  const input = event.target.closest("[data-application-search]");
+  if (!input) {
+    return;
+  }
+
+  keyword = input.value.trim().toLowerCase();
+  syncSearchInputs(input.value);
+  renderBoard(applications);
   renderTable(applications);
-  syncFilterUI();
 });
 
 tableSortButtons.forEach((button) => {
@@ -1415,6 +1663,9 @@ viewSwitch.addEventListener("click", (event) => {
 
 window.addEventListener("resize", syncWorkspaceColumns);
 
+filterGroup.dataset.applicationFilterGroup = "true";
+searchInput.dataset.applicationSearch = "true";
+ensureBoardFilterGroup();
 ensureWeekFilterChip();
 syncApplicationBadgeOptions(true);
 rerender();
