@@ -472,6 +472,10 @@ function showSuccessToast(message) {
 
 function downloadFile(filename, content, type = "text/plain;charset=utf-8") {
   const blob = new Blob([content], { type });
+  downloadBlob(filename, blob);
+}
+
+function downloadBlob(filename, blob) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -480,6 +484,43 @@ function downloadFile(filename, content, type = "text/plain;charset=utf-8") {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function downloadExamplePdf(filename) {
+  const content = `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 1 /Kids [3 0 R] >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 0 >>
+stream
+endstream
+endobj
+xref
+0 5
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000202 00000 n 
+trailer
+<< /Size 5 /Root 1 0 R >>
+startxref
+251
+%%EOF`;
+
+  downloadFile(filename, content, "application/pdf");
+}
+
+function downloadExampleZip(filename) {
+  const emptyZipBytes = new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  downloadBlob(filename, new Blob([emptyZipBytes], { type: "application/zip" }));
 }
 
 function padCalendarNumber(value) {
@@ -629,37 +670,25 @@ function buildCalendarFileContent() {
   ].join("\r\n");
 }
 
-async function exportCalendar() {
-  const filename = "求职申请日历.ics";
-  const content = buildCalendarFileContent();
-  const file = typeof File === "function"
-    ? new File([content], filename, { type: "text/calendar;charset=utf-8" })
-    : null;
+function exportCalendar() {
+  const content = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Campus Job Tracker//Example Calendar//ZH",
+    "CALSCALE:GREGORIAN",
+    "BEGIN:VEVENT",
+    "UID:example-event@campus-job-tracker",
+    "DTSTAMP:20260418T090000Z",
+    "DTSTART;VALUE=DATE:20260418",
+    "DTEND;VALUE=DATE:20260419",
+    "SUMMARY:Example Calendar Event",
+    "DESCRIPTION:Example ICS file for demo export.",
+    "END:VEVENT",
+    "END:VCALENDAR"
+  ].join("\r\n");
 
-  const canShareFile = Boolean(
-    file &&
-    navigator?.share &&
-    (!navigator.canShare || navigator.canShare({ files: [file] }))
-  );
-
-  if (canShareFile) {
-    try {
-      await navigator.share({
-        title: "求职申请日历",
-        text: "将截止日期和面试安排导入系统日历",
-        files: [file]
-      });
-      showSuccessToast("已调起系统分享，可导入手机日历");
-      return;
-    } catch (error) {
-      if (error?.name === "AbortError") {
-        return;
-      }
-    }
-  }
-
-  downloadFile(filename, content, "text/calendar;charset=utf-8");
-  showSuccessToast("日历文件已导出，可导入系统日历");
+  downloadFile("example.ics", content, "text/calendar;charset=utf-8");
+  showSuccessToast("已导出 example.ics");
 }
 
 function populateStatusSelect(selectEl, stage, selectedValue = "") {
@@ -1512,26 +1541,26 @@ materialsPanelActions.addEventListener("click", (event) => {
 
   const action = button.dataset.materialAction;
   if (action === "export-resume-cn") {
-    downloadFile("中文简历v3.txt", "中文简历 v3\n状态：已完成\n适配互联网产品岗位。");
-    showSuccessToast("中文简历已导出");
+    downloadExamplePdf("中文简历导出.pdf");
+    showSuccessToast("已导出中文简历示例文件");
     return;
   }
 
   if (action === "export-resume-en") {
-    downloadFile("English-Resume.txt", "English Resume\nStatus: Ready\nReusable for overseas roles.");
-    showSuccessToast("英文简历已导出");
+    downloadExamplePdf("英文简介导出.pdf");
+    showSuccessToast("已导出英文简介示例文件");
     return;
   }
 
   if (action === "export-portfolio") {
-    downloadFile("作品集说明.txt", "作品集\n1. 校园增长项目\n2. B 端产品复盘\n3. 商业化案例拆解");
-    showSuccessToast("作品集已导出");
+    downloadExampleZip("作品集和成绩单导出.zip");
+    showSuccessToast("已导出 ZIP 示例文件");
     return;
   }
 
   if (action === "export-proofs") {
-    downloadFile("证明材料清单.csv", "\uFEFF材料名称,状态,说明\n成绩单,已完成,统一打包可复用\n在读证明,已完成,可直接投递使用", "text/csv;charset=utf-8");
-    showSuccessToast("证明材料已导出");
+    downloadExampleZip("作品集和成绩单导出.zip");
+    showSuccessToast("已导出 ZIP 示例文件");
   }
 });
 
