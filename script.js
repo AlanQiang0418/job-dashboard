@@ -307,6 +307,7 @@ const closeModalBtn = document.querySelector("#closeModalBtn");
 const cancelModalBtn = document.querySelector("#cancelModalBtn");
 const focusUrgentBtn = document.querySelector("#focusUrgentBtn");
 const applicationBoardPanel = document.querySelector("#applicationBoardPanel");
+const boardScroll = document.querySelector(".board-scroll");
 const recommendedList = document.querySelector("#recommendedList");
 const timelineContainer = document.querySelector(".timeline");
 const materialsPanelActions = document.querySelector("#materialsPanel");
@@ -794,6 +795,26 @@ function getVisibleItems(items) {
   return items.filter((item) => matchesActiveFilter(item) && matchesKeyword(item));
 }
 
+function isMobileBoardViewport() {
+  return window.innerWidth <= 820;
+}
+
+function getBoardColumnsToRender(filteredItems) {
+  if (!isMobileBoardViewport()) {
+    return boardColumns;
+  }
+
+  if (activeFilter !== "all" && activeFilter !== "week") {
+    return boardColumns.filter((column) => column.id === activeFilter);
+  }
+
+  if (keyword || activeFilter === "week") {
+    return boardColumns.filter((column) => filteredItems.some((item) => item.stage === column.id));
+  }
+
+  return boardColumns;
+}
+
 function applyActiveFilter(filter) {
   activeFilter = filter;
   renderBoard(applications);
@@ -979,8 +1000,9 @@ function renderTaskCenter(items) {
 function renderBoard(items) {
   board.innerHTML = "";
   const filteredItems = getVisibleItems(items);
+  const columnsToRender = getBoardColumnsToRender(filteredItems);
 
-  boardColumns.forEach((column) => {
+  columnsToRender.forEach((column) => {
     const columnItems = filteredItems.filter((item) => item.stage === column.id);
     const section = document.createElement("section");
     section.className = "board-column fade-in";
@@ -1021,6 +1043,10 @@ function renderBoard(items) {
 
     board.appendChild(section);
   });
+
+  if (boardScroll) {
+    boardScroll.scrollLeft = 0;
+  }
 }
 
 function renderTable(items) {

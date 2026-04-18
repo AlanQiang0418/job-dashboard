@@ -1900,11 +1900,11 @@ select {
 
   .board-scroll {
     overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: visible;
     padding-bottom: 10px;
     scroll-snap-type: x proximity;
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-x;
+    overscroll-behavior-x: contain;
   }
 
   .board-column {
