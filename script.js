@@ -308,6 +308,7 @@ const cancelModalBtn = document.querySelector("#cancelModalBtn");
 const focusUrgentBtn = document.querySelector("#focusUrgentBtn");
 const applicationBoardPanel = document.querySelector("#applicationBoardPanel");
 const boardScroll = document.querySelector(".board-scroll");
+const boardSwipeHint = document.querySelector(".board-swipe-hint");
 const recommendedList = document.querySelector("#recommendedList");
 const timelineContainer = document.querySelector(".timeline");
 const materialsPanelActions = document.querySelector("#materialsPanel");
@@ -1049,12 +1050,16 @@ function renderBoard(items) {
 
   if (boardScroll) {
     requestAnimationFrame(() => {
+      const isSingleColumnLayout = isMobileBoardViewport() && columnsToRender.length <= 1;
       const shouldLockHorizontalScroll =
         isMobileBoardViewport() &&
-        (columnsToRender.length <= 1 || board.scrollWidth <= boardScroll.clientWidth + 24);
+        (isSingleColumnLayout || board.scrollWidth <= boardScroll.clientWidth + 24);
 
-      board.classList.toggle("board--single-column", shouldLockHorizontalScroll);
+      board.classList.toggle("board--single-column", isSingleColumnLayout);
       boardScroll.classList.toggle("board-scroll--locked", shouldLockHorizontalScroll);
+      if (boardSwipeHint) {
+        boardSwipeHint.hidden = shouldLockHorizontalScroll;
+      }
       boardScroll.scrollLeft = 0;
     });
   }
