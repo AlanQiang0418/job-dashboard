@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>求职申请管理看板</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero__copy">
+          <p class="eyebrow">Campus Job Tracker</p>
+          <h1>求职申请管理看板</h1>
+          <p class="hero__lead">
+            把零散的截止日期、材料准备和面试推进汇总到一个界面里，让求职季从“到处翻记录”变成“知道下一步做什么”。
+          </p>
+          <div class="hero__actions">
+            <button class="primary-btn" id="addApplicationBtn" type="button">新增申请</button>
+            <button class="ghost-btn" id="exportReportBtn" type="button">导出周报</button>
+          </div>
+        </div>
+
+        <aside class="hero__panel">
+          <div class="pulse-card">
+            <span class="pulse-card__label">当前急需处理</span>
+            <strong id="urgentCardTitle">腾讯产品经理培训生</strong>
+            <p id="urgentCardDesc">距离网申截止还有 18 小时，作品集仍待上传。</p>
+            <div class="pulse-card__meta">
+              <span id="urgentCardDeadline">DDL 04/18</span>
+              <span class="pulse-card__priority" id="urgentCardPriority">高优先</span>
+            </div>
+            <div class="pulse-card__actions">
+              <button class="pulse-btn" id="focusUrgentBtn" type="button">立即处理</button>
+            </div>
+          </div>
+        </aside>
+      </header>
+
+      <main class="dashboard">
+        <section class="metrics" aria-label="核心指标">
+          <article class="metric-card metric-card--interactive accent-blue" data-metric-filter="all" role="button" tabindex="0">
+            <span class="metric-card__label">投递总数</span>
+            <strong id="metricTotalValue">0</strong>
+            <p id="metricTotalDesc">当前看板中的全部申请岗位</p>
+          </article>
+          <article class="metric-card metric-card--interactive accent-coral" data-metric-filter="week" role="button" tabindex="0">
+            <span class="metric-card__label">本周截止</span>
+            <strong id="metricDeadlineValue">0</strong>
+            <p id="metricDeadlineDesc">本周内到期的申请岗位</p>
+          </article>
+          <article class="metric-card metric-card--interactive accent-mint" data-metric-filter="interview" role="button" tabindex="0">
+            <span class="metric-card__label">面试推进率</span>
+            <strong id="metricInterviewValue">0%</strong>
+            <p id="metricInterviewDesc">进入笔试/面试阶段的申请占比</p>
+          </article>
+          <article class="metric-card accent-gold">
+            <span class="metric-card__label">材料完整率</span>
+            <strong id="metricMaterialsValue">0%</strong>
+            <p id="metricMaterialsDesc">全部申请材料的完成进度</p>
+          </article>
+        </section>
+
+        <section class="workspace-grid">
+          <div class="left-rail">
+            <section class="panel" id="taskCenterPanel">
+              <div class="panel__head">
+                <div>
+                  <p class="section-kicker">Task Center</p>
+                  <h2>任务中心</h2>
+                  <p class="panel__subcopy">合并提醒和优先处理列表，按轻重缓急排序，直接进入下一步动作。</p>
+                </div>
+              </div>
+              <div class="task-list" id="taskList"></div>
+            </section>
+
+            <section class="panel" id="applicationBoardPanel">
+              <div class="panel__head">
+                <div class="panel__title-block">
+                  <p class="section-kicker">Application Board</p>
+                  <h2>申请进度看板</h2>
+                  <p class="panel__subcopy">支持看板和表格双视图，方便展示整体推进和逐项管理。</p>
+                </div>
+                <div class="panel__controls">
+                  <div class="view-switch" id="viewSwitch">
+                    <button class="view-switch__btn active" data-view="board" type="button">看板视图</button>
+                    <button class="view-switch__btn" data-view="table" type="button">表格管理</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="data-view is-active" id="boardView">
+                <div class="board" id="board"></div>
+              </div>
+
+              <div class="data-view" id="tableView">
+                <div class="toolbar toolbar--table">
+                  <input id="searchInput" type="search" placeholder="搜索公司 / 岗位 / 地区" />
+                  <div class="chip-group" id="filterGroup">
+                    <button class="chip active" data-filter="all" type="button">全部</button>
+                    <button class="chip" data-filter="wishlist" type="button">待投递</button>
+                    <button class="chip" data-filter="applied" type="button">已投递</button>
+                    <button class="chip" data-filter="interview" type="button">笔试/面试</button>
+                    <button class="chip" data-filter="offer" type="button">Offer/结果</button>
+                  </div>
+                </div>
+                <div class="table-shell">
+                  <table class="application-table">
+                    <thead>
+                      <tr>
+                        <th>公司</th>
+                        <th>岗位 / 工作</th>
+                        <th>
+                          <button class="table-sort" data-sort-key="deadline" type="button">
+                            Due Date
+                            <span class="table-sort__icon" data-sort-icon="deadline">↕</span>
+                          </button>
+                        </th>
+                        <th>
+                          <button class="table-sort" data-sort-key="stage" type="button">
+                            进度
+                            <span class="table-sort__icon" data-sort-icon="stage">↕</span>
+                          </button>
+                        </th>
+                        <th>下一步</th>
+                        <th>
+                          <button class="table-sort" data-sort-key="priority" type="button">
+                            优先级
+                            <span class="table-sort__icon" data-sort-icon="priority">↕</span>
+                          </button>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+
+          </div>
+
+          <div class="right-rail">
+            <section class="panel" id="timelinePanel">
+              <div class="panel__head">
+                <div>
+                  <p class="section-kicker">Timeline</p>
+                  <h2>面试日程</h2>
+                </div>
+              </div>
+              <div class="timeline">
+                <article class="timeline-item">
+                  <span class="timeline-item__time">04/18 10:00</span>
+                  <div>
+                    <strong>字节跳动 一面</strong>
+                    <p>线上视频面试，提前 15 分钟设备检查</p>
+                    <button class="mini-action" data-open-detail-key="字节跳动-商业化产品经理" type="button">查看申请</button>
+                  </div>
+                </article>
+                <article class="timeline-item">
+                  <span class="timeline-item__time">04/19 19:30</span>
+                  <div>
+                    <strong>美团 笔试</strong>
+                    <p>90 分钟，重点准备数据分析题</p>
+                    <button class="mini-action" data-open-detail-key="美团-策略运营校招生" type="button">查看申请</button>
+                  </div>
+                </article>
+                <article class="timeline-item">
+                  <span class="timeline-item__time">04/21 14:00</span>
+                  <div>
+                    <strong>腾讯 HR 面</strong>
+                    <p>整理过往实习亮点与转正意愿</p>
+                    <button class="mini-action" data-open-detail-key="腾讯-产品经理培训生" type="button">查看申请</button>
+                  </div>
+                </article>
+              </div>
+            </section>
+
+            <section class="panel" id="recommendedPanel">
+              <div class="panel__head">
+                <div>
+                  <p class="section-kicker">Recommended Jobs</p>
+                  <h2>推荐岗位</h2>
+                  <p class="panel__subcopy">基于当前投递偏好做轻量推荐，帮助用户补充机会池。</p>
+                </div>
+                <button class="ghost-btn" id="refreshRecommendedBtn" type="button">刷新推荐</button>
+              </div>
+              <div class="recommended-list" id="recommendedList"></div>
+            </section>
+
+            <section class="panel" id="materialsPanel">
+              <div class="panel__head">
+                <div>
+                  <p class="section-kicker">Materials</p>
+                  <h2>材料中心</h2>
+                  <p class="panel__subcopy">把材料展示改成行动入口，方便复用、补充和快速更新。</p>
+                </div>
+              </div>
+              <div class="materials-list">
+                <article class="material-item">
+                  <div>
+                    <strong>中文简历 v3</strong>
+                    <p>适配互联网产品岗位</p>
+                  </div>
+                  <div class="material-item__side">
+                    <span class="status-tag ready">已完成</span>
+                    <button class="mini-action" data-material-action="export-resume-cn" type="button">导出文件</button>
+                  </div>
+                </article>
+                <article class="material-item">
+                  <div>
+                    <strong>英文简历</strong>
+                    <p>海外岗位版本，支持直接复用</p>
+                  </div>
+                  <div class="material-item__side">
+                    <span class="status-tag ready">已完成</span>
+                    <button class="mini-action" data-material-action="export-resume-en" type="button">导出文件</button>
+                  </div>
+                </article>
+                <article class="material-item">
+                  <div>
+                    <strong>作品集</strong>
+                    <p>已整理成可直接投递的展示版本</p>
+                  </div>
+                  <div class="material-item__side">
+                    <span class="status-tag ready">已完成</span>
+                    <button class="mini-action" data-material-action="export-portfolio" type="button">导出文件</button>
+                  </div>
+                </article>
+                <article class="material-item">
+                  <div>
+                    <strong>成绩单 / 证明</strong>
+                    <p>统一打包，支持一键复用</p>
+                  </div>
+                  <div class="material-item__side">
+                    <span class="status-tag ready">已完成</span>
+                    <button class="mini-action" data-material-action="export-proofs" type="button">导出文件</button>
+                  </div>
+                </article>
+              </div>
+            </section>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <template id="cardTemplate">
+      <article class="job-card">
+        <div class="job-card__top">
+          <div>
+            <p class="job-card__company"></p>
+            <h3 class="job-card__role"></h3>
+          </div>
+          <span class="job-card__badge"></span>
+        </div>
+        <div class="job-card__meta">
+          <span class="job-card__priority"></span>
+          <span class="job-card__city"></span>
+          <span class="job-card__deadline"></span>
+        </div>
+        <div class="job-card__next">
+          <span class="job-card__next-label">下一步</span>
+          <p class="job-card__next-text"></p>
+        </div>
+      </article>
+    </template>
+
+    <dialog class="modal" id="applicationModal">
+      <form class="modal__card" id="applicationForm" method="dialog">
+        <div class="modal__head">
+          <div>
+            <p class="section-kicker">Quick Add</p>
+            <h2>新增申请</h2>
+          </div>
+          <button class="modal__close" id="closeModalBtn" type="button" aria-label="关闭">×</button>
+        </div>
+
+        <div class="modal__grid">
+          <label class="field">
+            <span>公司</span>
+            <input name="company" type="text" placeholder="例如：京东" required />
+          </label>
+          <label class="field">
+            <span>岗位 / 工作</span>
+            <input name="role" type="text" placeholder="例如：产品运营实习生" required />
+          </label>
+          <label class="field">
+            <span>城市</span>
+            <input name="city" type="text" placeholder="例如：北京" />
+          </label>
+          <label class="field">
+            <span>Due Date</span>
+            <input name="deadline" type="date" />
+          </label>
+          <label class="field">
+            <span>阶段</span>
+            <select name="stage" required>
+              <option value="wishlist">待投递</option>
+              <option value="applied">已投递</option>
+              <option value="interview">笔试/面试</option>
+              <option value="offer">Offer/结果</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>当前状态</span>
+            <select name="badge" id="applicationBadgeSelect" required>
+              <option value="">请选择</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>联系人</span>
+            <input name="contact" type="text" placeholder="例如：校招 HR / 邮箱" />
+          </label>
+          <label class="field">
+            <span>岗位链接</span>
+            <input name="jdLink" type="url" placeholder="https://example.com/job" />
+          </label>
+          <label class="field field--full">
+            <span>下一步动作</span>
+            <textarea name="nextStep" rows="3" placeholder="例如：今晚完成作品集补充并提交网申"></textarea>
+          </label>
+          <label class="field field--full">
+            <span>备注</span>
+            <textarea name="notes" rows="3" placeholder="例如：记录岗位匹配点、投递渠道或后续提醒"></textarea>
+          </label>
+        </div>
+
+        <div class="modal__actions">
+          <button class="ghost-btn" id="cancelModalBtn" type="button">取消</button>
+          <button class="primary-btn" type="submit">保存到看板</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="successToast" role="status" aria-live="polite">
+      <span class="toast__icon">✓</span>
+      <span class="toast__text">已添加成功</span>
+    </div>
+
+    <dialog class="drawer" id="detailsDrawer">
+      <div class="drawer__panel">
+        <div class="drawer__head">
+          <div>
+            <p class="section-kicker">Application Detail</p>
+            <h2 id="drawerTitle">公司详情</h2>
+          </div>
+          <div class="drawer__head-actions">
+            <button class="ghost-btn" id="drawerEditToggleBtn" type="button">修改信息</button>
+            <button class="drawer__close" id="closeDrawerBtn" type="button" aria-label="关闭">×</button>
+          </div>
+        </div>
+        <div class="drawer__meta" id="drawerMeta"></div>
+        <div class="drawer__section">
+          <h3>投递信息</h3>
+          <div class="drawer__grid">
+            <article>
+              <span>投递渠道</span>
+              <strong id="drawerChannel"></strong>
+            </article>
+            <article>
+              <span>联系人</span>
+              <strong id="drawerContact"></strong>
+            </article>
+            <article>
+              <span>岗位链接</span>
+              <a id="drawerLink" href="#" target="_blank" rel="noreferrer">查看 JD</a>
+            </article>
+            <article>
+              <span>当前阶段</span>
+              <strong id="drawerStage"></strong>
+            </article>
+          </div>
+        </div>
+        <div class="drawer__section" id="drawerOverviewSection">
+          <h3>当前进展</h3>
+          <div class="drawer__overview" id="drawerOverviewView">
+            <article>
+              <span>当前状态</span>
+              <strong id="drawerBadgeView"></strong>
+            </article>
+            <article>
+              <span>优先级</span>
+              <strong id="drawerPriorityView"></strong>
+            </article>
+            <article class="drawer__overview--full">
+              <span>下一步动作</span>
+              <p id="drawerNextStepView"></p>
+            </article>
+          </div>
+          <div class="drawer__overview drawer__overview--edit" id="drawerOverviewEdit" hidden>
+            <label class="field">
+              <span>申请阶段</span>
+              <select id="drawerStageSelect">
+                <option value="wishlist">待投递</option>
+                <option value="applied">已投递</option>
+                <option value="interview">笔试/面试</option>
+                <option value="offer">Offer/结果</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>截止日期</span>
+              <input id="drawerDeadlineInput" type="date" />
+            </label>
+            <label class="field">
+              <span>当前状态</span>
+              <select id="drawerBadgeSelect">
+                <option value="">请选择</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>优先级</span>
+              <select id="drawerPrioritySelect">
+                <option value="urgent">高优先</option>
+                <option value="mid">中优先</option>
+                <option value="low">低优先</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>联系人</span>
+              <input id="drawerContactInput" type="text" placeholder="填写联系人或渠道备注" />
+            </label>
+            <label class="field">
+              <span>岗位链接</span>
+              <input id="drawerLinkInput" type="url" placeholder="https://example.com/job" />
+            </label>
+            <label class="field field--full">
+              <span>下一步动作</span>
+              <textarea id="drawerNextStepInput" rows="3" placeholder="填写当前最重要的下一步动作"></textarea>
+            </label>
+          </div>
+        </div>
+        <div class="drawer__section" id="drawerNotesSection">
+          <h3>备注</h3>
+          <p class="drawer__notes" id="drawerNotes"></p>
+          <textarea class="drawer__notes-input" id="drawerNotesInput" rows="4" hidden></textarea>
+        </div>
+        <div class="drawer__actions" id="drawerActions" hidden>
+          <button class="danger-btn" id="drawerDeleteBtn" type="button">删除岗位</button>
+          <button class="ghost-btn" id="drawerResetBtn" type="button">重置改动</button>
+          <button class="primary-btn" id="drawerSaveBtn" type="button">保存更改</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="confirm-modal" id="deleteConfirmModal">
+      <div class="confirm-modal__card">
+        <p class="section-kicker">Confirm Delete</p>
+        <h2>确认删除这个岗位？</h2>
+        <p class="confirm-modal__text" id="deleteConfirmText">删除后将从看板、表格和任务中心中移除。</p>
+        <div class="confirm-modal__actions">
+          <button class="ghost-btn" id="cancelDeleteBtn" type="button">取消</button>
+          <button class="danger-btn" id="confirmDeleteBtn" type="button">确认删除</button>
+        </div>
+      </div>
+    </dialog>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
