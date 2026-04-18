@@ -1002,6 +1002,9 @@ function renderBoard(items) {
   const filteredItems = getVisibleItems(items);
   const columnsToRender = getBoardColumnsToRender(filteredItems);
 
+  board.classList.remove("board--single-column");
+  boardScroll?.classList.remove("board-scroll--locked");
+
   columnsToRender.forEach((column) => {
     const columnItems = filteredItems.filter((item) => item.stage === column.id);
     const section = document.createElement("section");
@@ -1045,7 +1048,15 @@ function renderBoard(items) {
   });
 
   if (boardScroll) {
-    boardScroll.scrollLeft = 0;
+    requestAnimationFrame(() => {
+      const shouldLockHorizontalScroll =
+        isMobileBoardViewport() &&
+        (columnsToRender.length <= 1 || board.scrollWidth <= boardScroll.clientWidth + 2);
+
+      board.classList.toggle("board--single-column", shouldLockHorizontalScroll);
+      boardScroll.classList.toggle("board-scroll--locked", shouldLockHorizontalScroll);
+      boardScroll.scrollLeft = 0;
+    });
   }
 }
 
