@@ -1051,7 +1051,7 @@ function renderBoard(items) {
     requestAnimationFrame(() => {
       const shouldLockHorizontalScroll =
         isMobileBoardViewport() &&
-        (columnsToRender.length <= 1 || board.scrollWidth <= boardScroll.clientWidth + 2);
+        (columnsToRender.length <= 1 || board.scrollWidth <= boardScroll.clientWidth + 24);
 
       board.classList.toggle("board--single-column", shouldLockHorizontalScroll);
       boardScroll.classList.toggle("board-scroll--locked", shouldLockHorizontalScroll);
