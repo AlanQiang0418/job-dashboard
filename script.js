@@ -278,6 +278,8 @@ const priorityWeight = {
   low: 1
 };
 
+const APPLICATIONS_STORAGE_KEY = "campus-job-tracker-applications-v1";
+
 const board = document.querySelector("#board");
 const tableBody = document.querySelector("#tableBody");
 const tableSortButtons = [...document.querySelectorAll(".table-sort")];
@@ -290,6 +292,7 @@ const tableView = document.querySelector("#tableView");
 const addApplicationBtn = document.querySelector("#addApplicationBtn");
 const exportReportBtn = document.querySelector("#exportReportBtn");
 const exportCalendarBtn = document.querySelector("#exportCalendarBtn");
+const restoreDefaultsBtn = document.querySelector("#restoreDefaultsBtn");
 const refreshRecommendedBtn = document.querySelector("#refreshRecommendedBtn");
 const applicationModal = document.querySelector("#applicationModal");
 const applicationForm = document.querySelector("#applicationForm");
@@ -457,6 +460,43 @@ function ensureApplicationShape(item, index) {
   item.stageLabel = getStageLabel(item.stage);
 }
 
+function cloneApplicationItem(item) {
+  return {
+    ...item,
+    materials: Array.isArray(item.materials) ? [...item.materials] : []
+  };
+}
+
+const defaultApplications = applications.map(cloneApplicationItem);
+
+function loadStoredApplications() {
+  try {
+    const raw = window.localStorage.getItem(APPLICATIONS_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function saveApplications() {
+  try {
+    const payload = applications.map(cloneApplicationItem);
+    window.localStorage.setItem(APPLICATIONS_STORAGE_KEY, JSON.stringify(payload));
+  } catch (error) {
+    // Ignore storage failures so the demo continues to work without persistence.
+  }
+}
+
+const storedApplications = loadStoredApplications();
+if (storedApplications) {
+  applications.splice(0, applications.length, ...storedApplications);
+}
+
 applications.forEach(ensureApplicationShape);
 
 function showSuccessToast(message) {
@@ -606,68 +646,6 @@ function buildCalendarEvent({
 
   lines.push("END:VEVENT");
   return lines.join("\r\n");
-}
-
-function buildCalendarFileContent() {
-  const events = [];
-
-  applications.forEach((item) => {
-    const deadlineDate = getDeadlineDate(item.deadline);
-    if (!deadlineDate || item.badge === "流程终止" || item.badge === "已放弃") {
-      return;
-    }
-
-    const nextDate = new Date(deadlineDate);
-    nextDate.setDate(nextDate.getDate() + 1);
-
-    events.push(
-      buildCalendarEvent({
-        uid: `${item.id}-deadline@campus-job-tracker`,
-        summary: `${item.company}${item.role} 截止日`,
-        description: `${item.stageLabel} / ${item.badge}\n下一步：${item.nextStep}`,
-        location: item.city || "",
-        startDate: deadlineDate,
-        endDate: nextDate,
-        allDay: true,
-        alarmMinutes: 18 * 60
-      })
-    );
-  });
-
-  timelineItems.forEach((entry) => {
-    const item = applications.find((application) => application.id === entry.applicationId);
-    const startDate = parseTimelineDateTime(entry.time);
-    if (!item || !startDate) {
-      return;
-    }
-
-    const endDate = new Date(startDate);
-    endDate.setMinutes(endDate.getMinutes() + getTimelineEventDurationMinutes(entry));
-
-    events.push(
-      buildCalendarEvent({
-        uid: `${entry.applicationId}-${formatICSDateTimeUTC(startDate)}@campus-job-tracker`,
-        summary: `${item.company}${item.role} - ${entry.title}`,
-        description: `${entry.desc}\n联系人：${item.contact || "未填写"}\n下一步：${item.nextStep}`,
-        location: item.city || "",
-        startDate,
-        endDate,
-        allDay: false,
-        alarmMinutes: 60
-      })
-    );
-  });
-
-  return [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//Campus Job Tracker//Calendar Export//ZH",
-    "CALSCALE:GREGORIAN",
-    "METHOD:PUBLISH",
-    "X-WR-CALNAME:求职申请日历",
-    ...events,
-    "END:VCALENDAR"
-  ].join("\r\n");
 }
 
 function exportCalendar() {
@@ -823,6 +801,14 @@ function applyActiveFilter(filter) {
   syncFilterUI();
 }
 
+function resetUiState() {
+  activeFilter = "all";
+  activeView = "board";
+  keyword = "";
+  activeTableSort = { key: "", direction: "asc" };
+  syncSearchInputs("");
+}
+
 function openTableViewWithFilter(filter) {
   ensureBoardFilterGroup();
   ensureWeekFilterChip();
@@ -915,72 +901,6 @@ function renderMetrics(items) {
   metricInterviewDesc.textContent = `${interviewCount} 个申请进入笔试/面试阶段`;
   metricMaterialsValue.textContent = "100%";
   metricMaterialsDesc.textContent = "4/4 份材料已完成整理";
-}
-
-function buildTaskItems(items) {
-  const tasks = [];
-
-  items.forEach((item) => {
-    if (item.stage === "wishlist") {
-      tasks.push({
-        applicationId: item.id,
-        score: (priorityWeight[item.deadlineLevel] || 0) * 10 + 20,
-        statusLabel: item.badge,
-        statusClass: getStatusBadgeClass(item),
-        title: `${item.company} ${item.role}`,
-        desc: item.deadline === "TBD" ? item.nextStep : `${item.deadline} 前需要完成投递，建议优先处理材料和网申。`,
-        actionLabel: "立即处理"
-      });
-      return;
-    }
-
-    if (item.stage === "interview") {
-      tasks.push({
-        applicationId: item.id,
-        score: (priorityWeight[item.deadlineLevel] || 0) * 10 + 15,
-        statusLabel: item.badge,
-        statusClass: getStatusBadgeClass(item),
-        title: `${item.company} ${item.role}`,
-        desc: item.nextStep,
-        actionLabel: "查看详情"
-      });
-      return;
-    }
-
-    if (item.stage === "applied") {
-      tasks.push({
-        applicationId: item.id,
-        score: 8,
-        statusLabel: item.badge,
-        statusClass: getStatusBadgeClass(item),
-        title: `${item.company} ${item.role}`,
-        desc: item.nextStep,
-        actionLabel: "查看详情"
-      });
-    }
-  });
-
-  return tasks.sort((left, right) => right.score - left.score || left.title.localeCompare(right.title, "zh-CN"));
-}
-
-function renderTaskCenter(items) {
-  const tasks = buildTaskItems(items);
-  taskList.innerHTML = "";
-
-  tasks.forEach((task, index) => {
-    const article = document.createElement("article");
-    article.className = "task-card fade-in";
-    article.innerHTML = `
-      <span class="task-card__rank">${index + 1}</span>
-      <div class="task-card__meta">
-        <span class="task-card__type ${task.statusClass}">${task.statusLabel}</span>
-        <h3 class="task-card__title">${task.title}</h3>
-        <p class="task-card__desc">${task.desc}</p>
-      </div>
-      <button class="task-card__action" data-task-action="open-detail" data-application-id="${task.applicationId}" type="button">${task.actionLabel}</button>
-    `;
-    taskList.appendChild(article);
-  });
 }
 
 function buildTaskItems(items) {
@@ -1314,6 +1234,7 @@ function syncWorkspaceColumns() {
 
 function rerender() {
   applications.forEach(ensureApplicationShape);
+  saveApplications();
   renderHeroCard(applications);
   renderMetrics(applications);
   renderTaskCenter(applications);
@@ -1426,6 +1347,30 @@ applicationForm.addEventListener("submit", (event) => {
 exportReportBtn.addEventListener("click", exportWeeklyReport);
 exportCalendarBtn?.addEventListener("click", () => {
   exportCalendar();
+});
+restoreDefaultsBtn?.addEventListener("click", () => {
+  const shouldRestore = window.confirm("恢复默认示例数据会覆盖当前本地保存的申请记录，是否继续？");
+  if (!shouldRestore) {
+    return;
+  }
+
+  applications.splice(0, applications.length, ...defaultApplications.map(cloneApplicationItem));
+  resetUiState();
+
+  if (detailsDrawer.open) {
+    detailsDrawer.close();
+  }
+
+  if (deleteConfirmModal.open) {
+    deleteConfirmModal.close();
+  }
+
+  if (applicationModal.open) {
+    closeApplicationModal();
+  }
+
+  rerender();
+  showSuccessToast("已恢复默认示例数据");
 });
 
 focusUrgentBtn.addEventListener("click", () => {
