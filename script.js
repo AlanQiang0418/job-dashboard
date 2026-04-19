@@ -436,13 +436,20 @@ function shiftMonth(date, offset) {
 }
 
 function compareTimelineEvents(left, right) {
-  const dateDiff = left.date.getTime() - right.date.getTime();
+  const leftDay = left.dateKey || getCalendarDateKey(left.date);
+  const rightDay = right.dateKey || getCalendarDateKey(right.date);
+  const dateDiff = leftDay.localeCompare(rightDay);
   if (dateDiff !== 0) {
     return dateDiff;
   }
 
   if (left.rank !== right.rank) {
     return left.rank - right.rank;
+  }
+
+  const timeDiff = left.date.getTime() - right.date.getTime();
+  if (timeDiff !== 0) {
+    return timeDiff;
   }
 
   return left.title.localeCompare(right.title, "zh-CN");
