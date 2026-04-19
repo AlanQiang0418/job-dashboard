@@ -289,6 +289,8 @@ const filterGroup = document.querySelector("#filterGroup");
 const viewSwitch = document.querySelector("#viewSwitch");
 const boardView = document.querySelector("#boardView");
 const tableView = document.querySelector("#tableView");
+const calendarView = document.querySelector("#calendarView");
+const weekCalendar = document.querySelector("#weekCalendar");
 const addApplicationBtn = document.querySelector("#addApplicationBtn");
 const exportReportBtn = document.querySelector("#exportReportBtn");
 const exportCalendarBtn = document.querySelector("#exportCalendarBtn");
@@ -369,6 +371,7 @@ let isDrawerEditMode = false;
 let toastTimer = null;
 let syncColumnsFrame = null;
 let visibleTimelineMonth = null;
+let visibleWeekStart = null;
 
 applicationCityInput.removeAttribute("required");
 applicationDeadlineInput.removeAttribute("required");
@@ -504,6 +507,73 @@ function getTimelineCalendarEvents(items) {
 function getInitialTimelineMonth(events) {
   const sourceDate = events[0]?.date || new Date();
   return getMonthStart(sourceDate);
+}
+
+function getWeekStart(date) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - start.getDay());
+  return start;
+}
+
+function addDays(date, days) {
+  const nextDate = new Date(date);
+  nextDate.setDate(nextDate.getDate() + days);
+  return nextDate;
+}
+
+function isSameDate(left, right) {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+}
+
+function formatWeekRangeTitle(weekStart) {
+  const weekEnd = addDays(weekStart, 6);
+  const sameMonth = weekStart.getMonth() === weekEnd.getMonth();
+  if (sameMonth) {
+    return `${weekStart.getFullYear()}年${weekStart.getMonth() + 1}月`;
+  }
+  return `${weekStart.getMonth() + 1}月${weekStart.getDate()}日 - ${weekEnd.getMonth() + 1}月${weekEnd.getDate()}日`;
+}
+
+function formatWeekDayHeader(date) {
+  const weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+  return {
+    weekday: weekdays[date.getDay()],
+    day: String(date.getDate()),
+    monthDay: `${date.getMonth() + 1}/${date.getDate()}`
+  };
+}
+
+function getHourLabel(hour) {
+  if (hour === 12) {
+    return "12 PM";
+  }
+  if (hour > 12) {
+    return `${hour - 12} PM`;
+  }
+  return `${hour} AM`;
+}
+
+function compareWeekCalendarEvents(left, right) {
+  if (left.allDay !== right.allDay) {
+    return left.allDay ? -1 : 1;
+  }
+
+  return compareTimelineEvents(left, right);
+}
+
+function getWeekCalendarEvents(items) {
+  return getTimelineCalendarEvents(items)
+    .map((event) => ({
+      ...event,
+      allDay: event.type === "deadline",
+      hour: event.type === "deadline" ? null : event.date.getHours()
+    }))
+    .sort(compareWeekCalendarEvents);
 }
 
 function getStageLabel(stage) {
@@ -923,6 +993,7 @@ function resetUiState() {
   keyword = "";
   activeTableSort = { key: "", direction: "asc" };
   visibleTimelineMonth = null;
+  visibleWeekStart = null;
   syncSearchInputs("");
 }
 
@@ -1428,6 +1499,168 @@ function renderTimeline() {
   }
 }
 
+function createWeekCalendarEvent(event) {
+  const button = document.createElement("button");
+  button.className = `week-calendar__event week-calendar__event--${event.type}`;
+  button.dataset.openApplicationId = event.applicationId;
+  button.type = "button";
+
+  const meta = document.createElement("span");
+  meta.className = "week-calendar__event-meta";
+  meta.textContent = event.allDay ? event.typeLabel : `${event.timeLabel} · ${event.typeLabel}`;
+
+  const title = document.createElement("strong");
+  title.textContent = event.title;
+
+  button.appendChild(meta);
+  button.appendChild(title);
+  return button;
+}
+
+function renderWeekCalendar(items) {
+  if (!weekCalendar) {
+    return;
+  }
+
+  weekCalendar.innerHTML = "";
+
+  try {
+  const events = getWeekCalendarEvents(items);
+  const currentWeekStart = getWeekStart(new Date());
+  const hasCurrentWeekEvents = events.some((event) => {
+    const eventWeekStart = getWeekStart(event.date);
+    return isSameDate(eventWeekStart, currentWeekStart);
+  });
+
+  if (!visibleWeekStart) {
+    visibleWeekStart = hasCurrentWeekEvents
+      ? currentWeekStart
+      : getWeekStart(events[0]?.date || new Date());
+  }
+
+  const weekDays = Array.from({ length: 7 }, (_, index) => addDays(visibleWeekStart, index));
+  const weekEvents = events.filter((event) =>
+    weekDays.some((day) => isSameDate(day, event.date))
+  );
+  const hours = Array.from({ length: 14 }, (_, index) => index + 8);
+
+  const toolbar = document.createElement("div");
+  toolbar.className = "week-calendar__toolbar";
+
+  const todayButton = document.createElement("button");
+  todayButton.className = "week-calendar__today";
+  todayButton.dataset.weekCalendarNav = "today";
+  todayButton.type = "button";
+  todayButton.textContent = "Today";
+
+  const prevButton = document.createElement("button");
+  prevButton.className = "week-calendar__nav";
+  prevButton.dataset.weekCalendarNav = "prev";
+  prevButton.type = "button";
+  prevButton.setAttribute("aria-label", "上一周");
+  prevButton.textContent = "<";
+
+  const nextButton = document.createElement("button");
+  nextButton.className = "week-calendar__nav";
+  nextButton.dataset.weekCalendarNav = "next";
+  nextButton.type = "button";
+  nextButton.setAttribute("aria-label", "下一周");
+  nextButton.textContent = ">";
+
+  const title = document.createElement("div");
+  title.className = "week-calendar__title";
+  const titleText = document.createElement("strong");
+  titleText.textContent = formatWeekRangeTitle(visibleWeekStart);
+  const titleMeta = document.createElement("span");
+  titleMeta.textContent = `${weekEvents.length} 个任务`;
+  title.appendChild(titleText);
+  title.appendChild(titleMeta);
+
+  toolbar.appendChild(todayButton);
+  toolbar.appendChild(prevButton);
+  toolbar.appendChild(nextButton);
+  toolbar.appendChild(title);
+
+  const shell = document.createElement("div");
+  shell.className = "week-calendar__shell";
+
+  const grid = document.createElement("div");
+  grid.className = "week-calendar__grid";
+
+  const timezone = document.createElement("div");
+  timezone.className = "week-calendar__timezone";
+  timezone.textContent = "GMT-04";
+  grid.appendChild(timezone);
+
+  weekDays.forEach((day) => {
+    const dayInfo = formatWeekDayHeader(day);
+    const header = document.createElement("div");
+    header.className = "week-calendar__day";
+    if (isSameDate(day, new Date())) {
+      header.classList.add("is-today");
+    }
+
+    const weekday = document.createElement("span");
+    weekday.className = "week-calendar__weekday";
+    weekday.textContent = dayInfo.weekday;
+    const dayNumber = document.createElement("strong");
+    dayNumber.textContent = dayInfo.day;
+    const monthDay = document.createElement("span");
+    monthDay.className = "week-calendar__month-day";
+    monthDay.textContent = dayInfo.monthDay;
+
+    header.appendChild(weekday);
+    header.appendChild(dayNumber);
+    header.appendChild(monthDay);
+    grid.appendChild(header);
+  });
+
+  const allDayLabel = document.createElement("div");
+  allDayLabel.className = "week-calendar__time";
+  allDayLabel.textContent = "全天";
+  grid.appendChild(allDayLabel);
+
+  weekDays.forEach((day) => {
+    const cell = document.createElement("div");
+    cell.className = "week-calendar__cell week-calendar__cell--all-day";
+    weekEvents
+      .filter((event) => event.allDay && isSameDate(event.date, day))
+      .forEach((event) => {
+        cell.appendChild(createWeekCalendarEvent(event));
+      });
+    grid.appendChild(cell);
+  });
+
+  hours.forEach((hour) => {
+    const time = document.createElement("div");
+    time.className = "week-calendar__time";
+    time.textContent = getHourLabel(hour);
+    grid.appendChild(time);
+
+    weekDays.forEach((day) => {
+      const cell = document.createElement("div");
+      cell.className = "week-calendar__cell";
+      weekEvents
+        .filter((event) => !event.allDay && event.hour === hour && isSameDate(event.date, day))
+        .forEach((event) => {
+          cell.appendChild(createWeekCalendarEvent(event));
+        });
+      grid.appendChild(cell);
+    });
+  });
+
+  shell.appendChild(grid);
+  weekCalendar.appendChild(toolbar);
+  weekCalendar.appendChild(shell);
+  } catch (error) {
+    weekCalendar.innerHTML = "";
+    const fallback = document.createElement("div");
+    fallback.className = "week-calendar__fallback";
+    fallback.textContent = "日历视图暂时无法生成，可以切换回看板或表格继续查看申请。";
+    weekCalendar.appendChild(fallback);
+  }
+}
+
 function renderRecommended() {
   recommendedList.innerHTML = "";
 
@@ -1517,8 +1750,11 @@ function openDetailsDrawer(applicationId) {
 
 function syncView() {
   const isBoardView = activeView === "board";
+  const isTableView = activeView === "table";
+  const isCalendarView = activeView === "calendar";
   boardView.classList.toggle("is-active", isBoardView);
-  tableView.classList.toggle("is-active", !isBoardView);
+  tableView.classList.toggle("is-active", isTableView);
+  calendarView?.classList.toggle("is-active", isCalendarView);
 
   [...viewSwitch.querySelectorAll(".view-switch__btn")].forEach((button) => {
     button.classList.toggle("active", button.dataset.view === activeView);
@@ -1575,6 +1811,7 @@ function rerender() {
   renderBoard(applications);
   renderTable(applications);
   renderTimeline();
+  renderWeekCalendar(applications);
   renderRecommended();
   syncFilterUI();
   syncView();
@@ -1776,6 +2013,26 @@ timelineContainer.addEventListener("click", (event) => {
     return;
   }
   openDetailsDrawer(button.dataset.openApplicationId);
+});
+
+weekCalendar?.addEventListener("click", (event) => {
+  const navButton = event.target.closest("[data-week-calendar-nav]");
+  if (navButton) {
+    const action = navButton.dataset.weekCalendarNav;
+    if (action === "today") {
+      visibleWeekStart = getWeekStart(new Date());
+    } else {
+      visibleWeekStart = addDays(visibleWeekStart || getWeekStart(new Date()), action === "prev" ? -7 : 7);
+    }
+    renderWeekCalendar(applications);
+    return;
+  }
+
+  const eventButton = event.target.closest("[data-open-application-id]");
+  if (!eventButton) {
+    return;
+  }
+  openDetailsDrawer(eventButton.dataset.openApplicationId);
 });
 
 recommendedList.addEventListener("click", (event) => {

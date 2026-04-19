@@ -86,12 +86,13 @@
                 <div class="panel__title-block">
                   <p class="section-kicker">Application Board</p>
                   <h2>申请进度看板</h2>
-                  <p class="panel__subcopy">支持看板和表格双视图，方便展示整体推进和逐项管理。</p>
+                  <p class="panel__subcopy">支持看板、表格和日历视图，方便展示整体推进和逐项管理。</p>
                 </div>
                 <div class="panel__controls">
                   <div class="view-switch" id="viewSwitch">
                     <button class="view-switch__btn active" data-view="board" type="button">看板视图</button>
                     <button class="view-switch__btn" data-view="table" type="button">表格管理</button>
+                    <button class="view-switch__btn" data-view="calendar" type="button">日历视图</button>
                   </div>
                 </div>
               </div>
@@ -147,6 +148,10 @@
                     <tbody id="tableBody"></tbody>
                   </table>
                 </div>
+              </div>
+
+              <div class="data-view" id="calendarView">
+                <div class="week-calendar" id="weekCalendar"></div>
               </div>
             </section>
 
@@ -468,7 +473,7 @@
     </dialog>
 
     <footer class="site-version" aria-label="Version">
-      <span>v1.6.1</span>
+      <span>v1.6.2</span>
     </footer>
 
     <script src="./script.js"></script>
