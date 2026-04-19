@@ -368,6 +368,7 @@ let currentDrawerApplicationId = null;
 let isDrawerEditMode = false;
 let toastTimer = null;
 let syncColumnsFrame = null;
+let visibleTimelineMonth = null;
 
 applicationCityInput.removeAttribute("required");
 applicationDeadlineInput.removeAttribute("required");
@@ -393,24 +394,109 @@ function dateInputToDeadline(value) {
 }
 
 function deadlineToDateInput(value) {
-  if (!value || !value.includes("/")) {
+  const deadline = String(value || "");
+  if (!deadline.includes("/")) {
     return "";
   }
-  const [month, day] = value.split("/");
+  const [month, day] = deadline.split("/");
   return `${new Date().getFullYear()}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 }
 
 function getDeadlineDate(value) {
-  if (!value || !value.includes("/")) {
+  const deadline = String(value || "");
+  if (!deadline.includes("/")) {
     return null;
   }
-  const [month, day] = value.split("/").map(Number);
+  const [month, day] = deadline.split("/").map(Number);
+  if (Number.isNaN(month) || Number.isNaN(day)) {
+    return null;
+  }
   return new Date(new Date().getFullYear(), month - 1, day);
 }
 
 function getDeadlineSortValue(item) {
   const date = getDeadlineDate(item.deadline);
   return date ? date.getTime() : Number.MAX_SAFE_INTEGER;
+}
+
+function getCalendarDateKey(date) {
+  return `${date.getFullYear()}-${padCalendarNumber(date.getMonth() + 1)}-${padCalendarNumber(date.getDate())}`;
+}
+
+function getTimelineMonthLabel(date) {
+  return `${date.getFullYear()}年${date.getMonth() + 1}月`;
+}
+
+function getMonthStart(date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function shiftMonth(date, offset) {
+  return new Date(date.getFullYear(), date.getMonth() + offset, 1);
+}
+
+function compareTimelineEvents(left, right) {
+  const dateDiff = left.date.getTime() - right.date.getTime();
+  if (dateDiff !== 0) {
+    return dateDiff;
+  }
+
+  if (left.rank !== right.rank) {
+    return left.rank - right.rank;
+  }
+
+  return left.title.localeCompare(right.title, "zh-CN");
+}
+
+function getTimelineCalendarEvents(items) {
+  const events = [];
+
+  timelineItems.forEach((entry) => {
+    const item = items.find((application) => application.id === entry.applicationId);
+    const date = parseTimelineDateTime(entry.time);
+    if (!item || !date) {
+      return;
+    }
+
+    const isExam = entry.title.includes("笔试") || entry.desc.includes("笔试");
+    events.push({
+      type: "interview",
+      typeLabel: isExam ? "笔试" : "面试",
+      rank: 0,
+      date,
+      dateKey: getCalendarDateKey(date),
+      timeLabel: entry.time,
+      title: entry.title,
+      desc: entry.desc,
+      applicationId: item.id
+    });
+  });
+
+  items.forEach((item) => {
+    const date = getDeadlineDate(item.deadline);
+    if (!date) {
+      return;
+    }
+
+    events.push({
+      type: "deadline",
+      typeLabel: "截止",
+      rank: 1,
+      date,
+      dateKey: getCalendarDateKey(date),
+      timeLabel: "全天",
+      title: `${item.company} · ${item.role}`,
+      desc: `${item.deadline} 截止 · ${getStageLabel(item.stage)} · ${item.badge || "未设置状态"}`,
+      applicationId: item.id
+    });
+  });
+
+  return events.sort(compareTimelineEvents);
+}
+
+function getInitialTimelineMonth(events) {
+  const sourceDate = events[0]?.date || new Date();
+  return getMonthStart(sourceDate);
 }
 
 function getStageLabel(stage) {
@@ -829,6 +915,7 @@ function resetUiState() {
   activeView = "board";
   keyword = "";
   activeTableSort = { key: "", direction: "asc" };
+  visibleTimelineMonth = null;
   syncSearchInputs("");
 }
 
@@ -1114,9 +1201,7 @@ function renderTable(items) {
   });
 }
 
-function renderTimeline() {
-  timelineContainer.innerHTML = "";
-
+function renderTimelineList() {
   timelineItems.forEach((entry) => {
     const item = applications.find((application) => application.id === entry.applicationId);
     if (!item) {
@@ -1125,16 +1210,215 @@ function renderTimeline() {
 
     const article = document.createElement("article");
     article.className = "timeline-item";
-    article.innerHTML = `
-      <span class="timeline-item__time">${entry.time}</span>
-      <div>
-        <strong>${entry.title}</strong>
-        <p>${entry.desc}</p>
-        <button class="mini-action" data-open-application-id="${item.id}" type="button">查看申请</button>
-      </div>
-    `;
+
+    const time = document.createElement("span");
+    time.className = "timeline-item__time";
+    time.textContent = entry.time;
+
+    const content = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = entry.title;
+    const desc = document.createElement("p");
+    desc.textContent = entry.desc;
+    const button = document.createElement("button");
+    button.className = "mini-action";
+    button.dataset.openApplicationId = item.id;
+    button.type = "button";
+    button.textContent = "查看申请";
+
+    content.appendChild(title);
+    content.appendChild(desc);
+    content.appendChild(button);
+    article.appendChild(time);
+    article.appendChild(content);
     timelineContainer.appendChild(article);
   });
+}
+
+function renderTimeline() {
+  timelineContainer.innerHTML = "";
+
+  try {
+  const events = getTimelineCalendarEvents(applications);
+  if (!visibleTimelineMonth) {
+    visibleTimelineMonth = getInitialTimelineMonth(events);
+  }
+
+  const monthStart = getMonthStart(visibleTimelineMonth);
+  const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+  const leadingBlanks = monthStart.getDay();
+  const daysInMonth = monthEnd.getDate();
+  const totalCells = Math.ceil((leadingBlanks + daysInMonth) / 7) * 7;
+  const monthEvents = events.filter(
+    (event) =>
+      event.date.getFullYear() === monthStart.getFullYear() &&
+      event.date.getMonth() === monthStart.getMonth()
+  );
+  const eventsByDate = new Map();
+
+  monthEvents.forEach((event) => {
+    const dateEvents = eventsByDate.get(event.dateKey) || [];
+    dateEvents.push(event);
+    eventsByDate.set(event.dateKey, dateEvents);
+  });
+
+  const calendar = document.createElement("div");
+  calendar.className = "timeline-calendar";
+
+  const header = document.createElement("div");
+  header.className = "timeline-calendar__header";
+
+  const titleWrap = document.createElement("div");
+  titleWrap.className = "timeline-calendar__title";
+  const title = document.createElement("strong");
+  title.textContent = getTimelineMonthLabel(monthStart);
+  const summary = document.createElement("p");
+  summary.textContent = `${monthEvents.length} 个日程 / 截止日期`;
+  titleWrap.appendChild(title);
+  titleWrap.appendChild(summary);
+
+  const nav = document.createElement("div");
+  nav.className = "timeline-calendar__nav";
+  nav.setAttribute("aria-label", "切换月份");
+
+  const prevButton = document.createElement("button");
+  prevButton.className = "timeline-calendar__nav-btn";
+  prevButton.dataset.timelineMonth = "prev";
+  prevButton.type = "button";
+  prevButton.setAttribute("aria-label", "上个月");
+  prevButton.textContent = "<";
+
+  const nextButton = document.createElement("button");
+  nextButton.className = "timeline-calendar__nav-btn";
+  nextButton.dataset.timelineMonth = "next";
+  nextButton.type = "button";
+  nextButton.setAttribute("aria-label", "下个月");
+  nextButton.textContent = ">";
+
+  nav.appendChild(prevButton);
+  nav.appendChild(nextButton);
+  header.appendChild(titleWrap);
+  header.appendChild(nav);
+
+  const weekdays = document.createElement("div");
+  weekdays.className = "timeline-calendar__weekdays";
+  weekdays.setAttribute("aria-hidden", "true");
+  ["日", "一", "二", "三", "四", "五", "六"].forEach((label) => {
+    const dayLabel = document.createElement("span");
+    dayLabel.textContent = label;
+    weekdays.appendChild(dayLabel);
+  });
+
+  const grid = document.createElement("div");
+  grid.className = "timeline-calendar__grid";
+
+  for (let cellIndex = 0; cellIndex < totalCells; cellIndex += 1) {
+    const dayNumber = cellIndex - leadingBlanks + 1;
+
+    if (dayNumber < 1 || dayNumber > daysInMonth) {
+      const emptyCell = document.createElement("span");
+      emptyCell.className = "timeline-day timeline-day--empty";
+      grid.appendChild(emptyCell);
+      continue;
+    }
+
+    const date = new Date(monthStart.getFullYear(), monthStart.getMonth(), dayNumber);
+    const dateKey = getCalendarDateKey(date);
+    const dateEvents = (eventsByDate.get(dateKey) || []).sort(compareTimelineEvents);
+    const hasInterview = dateEvents.some((event) => event.type === "interview");
+    const hasDeadline = dateEvents.some((event) => event.type === "deadline");
+    const cell = document.createElement("div");
+    cell.className = "timeline-day";
+
+    if (dateEvents.length) {
+      cell.classList.add("timeline-day--event");
+      cell.tabIndex = 0;
+      cell.setAttribute("aria-label", `${monthStart.getMonth() + 1}月${dayNumber}日，${dateEvents.length} 个日程`);
+    }
+
+    if (hasInterview) {
+      cell.classList.add("timeline-day--interview");
+    }
+
+    if (hasDeadline) {
+      cell.classList.add("timeline-day--deadline");
+    }
+
+    const dateLabel = document.createElement("span");
+    dateLabel.className = "timeline-day__date";
+    dateLabel.textContent = String(dayNumber);
+    cell.appendChild(dateLabel);
+
+    if (!dateEvents.length) {
+      const placeholder = document.createElement("span");
+      placeholder.className = "timeline-day__placeholder";
+      cell.appendChild(placeholder);
+      grid.appendChild(cell);
+      continue;
+    }
+
+    const count = document.createElement("span");
+    count.className = "timeline-day__count";
+    count.textContent = `${dateEvents.length}项`;
+    cell.appendChild(count);
+
+    const dots = document.createElement("span");
+    dots.className = "timeline-day__dots";
+    dateEvents.slice(0, 4).forEach((event) => {
+      const dot = document.createElement("span");
+      dot.className = `timeline-day__dot timeline-day__dot--${event.type}`;
+      dots.appendChild(dot);
+    });
+    cell.appendChild(dots);
+
+    const tooltip = document.createElement("div");
+    tooltip.className = "timeline-tooltip";
+    tooltip.setAttribute("role", "tooltip");
+
+    dateEvents.forEach((event) => {
+      const tooltipItem = document.createElement("article");
+      tooltipItem.className = "timeline-tooltip__item";
+
+      const type = document.createElement("span");
+      type.className = `timeline-tooltip__kind timeline-tooltip__kind--${event.type}`;
+      type.textContent = event.typeLabel;
+
+      const eventTitle = document.createElement("strong");
+      eventTitle.textContent = event.title;
+
+      const eventTime = document.createElement("span");
+      eventTime.className = "timeline-tooltip__time";
+      eventTime.textContent = event.timeLabel;
+
+      const desc = document.createElement("p");
+      desc.textContent = event.desc;
+
+      const button = document.createElement("button");
+      button.className = "mini-action";
+      button.dataset.openApplicationId = event.applicationId;
+      button.type = "button";
+      button.textContent = "查看申请";
+
+      tooltipItem.appendChild(type);
+      tooltipItem.appendChild(eventTitle);
+      tooltipItem.appendChild(eventTime);
+      tooltipItem.appendChild(desc);
+      tooltipItem.appendChild(button);
+      tooltip.appendChild(tooltipItem);
+    });
+
+    cell.appendChild(tooltip);
+    grid.appendChild(cell);
+  }
+
+  calendar.appendChild(header);
+  calendar.appendChild(weekdays);
+  calendar.appendChild(grid);
+  timelineContainer.appendChild(calendar);
+  } catch (error) {
+    timelineContainer.innerHTML = "";
+    renderTimelineList();
+  }
 }
 
 function renderRecommended() {
@@ -1471,6 +1755,15 @@ tableBody.addEventListener("click", (event) => {
 });
 
 timelineContainer.addEventListener("click", (event) => {
+  const monthButton = event.target.closest("[data-timeline-month]");
+  if (monthButton) {
+    const baseMonth = visibleTimelineMonth || getInitialTimelineMonth(getTimelineCalendarEvents(applications));
+    const direction = monthButton.dataset.timelineMonth === "prev" ? -1 : 1;
+    visibleTimelineMonth = shiftMonth(baseMonth, direction);
+    renderTimeline();
+    return;
+  }
+
   const button = event.target.closest("[data-open-application-id]");
   if (!button) {
     return;
