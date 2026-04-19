@@ -1525,7 +1525,7 @@ function renderWeekCalendar(items) {
   weekCalendar.innerHTML = "";
 
   try {
-  const events = getWeekCalendarEvents(items);
+  const events = getWeekCalendarEvents(getVisibleItems(items));
   const currentWeekStart = getWeekStart(new Date());
   const hasCurrentWeekEvents = events.some((event) => {
     const eventWeekStart = getWeekStart(event.date);
@@ -2214,6 +2214,7 @@ applicationBoardPanel.addEventListener("input", (event) => {
   syncSearchInputs(input.value);
   renderBoard(applications);
   renderTable(applications);
+  renderWeekCalendar(applications);
 });
 
 tableSortButtons.forEach((button) => {

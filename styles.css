@@ -692,14 +692,16 @@ select {
   width: 100%;
 }
 
-.toolbar--board {
+.toolbar--board,
+.toolbar--calendar {
   justify-content: space-between;
   margin-bottom: 16px;
   width: 100%;
 }
 
 .toolbar--board .chip-group,
-.toolbar--table .chip-group {
+.toolbar--table .chip-group,
+.toolbar--calendar .chip-group {
   justify-content: flex-end;
 }
 

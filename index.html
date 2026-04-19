@@ -91,7 +91,7 @@
                 <div class="panel__controls">
                   <div class="view-switch" id="viewSwitch">
                     <button class="view-switch__btn active" data-view="board" type="button">看板视图</button>
-                    <button class="view-switch__btn" data-view="table" type="button">表格管理</button>
+                    <button class="view-switch__btn" data-view="table" type="button">表格视图</button>
                     <button class="view-switch__btn" data-view="calendar" type="button">日历视图</button>
                   </div>
                 </div>
@@ -151,6 +151,16 @@
               </div>
 
               <div class="data-view" id="calendarView">
+                <div class="toolbar toolbar--calendar">
+                  <input id="calendarSearchInput" type="search" placeholder="搜索公司 / 岗位 / 地区" data-application-search />
+                  <div class="chip-group" id="calendarFilterGroup" data-application-filter-group>
+                    <button class="chip active" data-filter="all" type="button">全部</button>
+                    <button class="chip" data-filter="wishlist" type="button">待投递</button>
+                    <button class="chip" data-filter="applied" type="button">已投递</button>
+                    <button class="chip" data-filter="interview" type="button">笔试/面试</button>
+                    <button class="chip" data-filter="offer" type="button">Offer/结果</button>
+                  </div>
+                </div>
                 <div class="week-calendar" id="weekCalendar"></div>
               </div>
             </section>
