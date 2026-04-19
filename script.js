@@ -293,6 +293,7 @@ const addApplicationBtn = document.querySelector("#addApplicationBtn");
 const exportReportBtn = document.querySelector("#exportReportBtn");
 const exportCalendarBtn = document.querySelector("#exportCalendarBtn");
 const restoreDefaultsBtn = document.querySelector("#restoreDefaultsBtn");
+const openReadmeBtn = document.querySelector("#openReadmeBtn");
 const refreshRecommendedBtn = document.querySelector("#refreshRecommendedBtn");
 const applicationModal = document.querySelector("#applicationModal");
 const applicationForm = document.querySelector("#applicationForm");
@@ -479,7 +480,7 @@ function loadStoredApplications() {
     }
 
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : null;
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
   } catch (error) {
     return null;
   }
@@ -1413,6 +1414,10 @@ restoreDefaultsBtn?.addEventListener("click", () => {
 
   rerender();
   showSuccessToast("已恢复默认示例数据");
+});
+
+openReadmeBtn?.addEventListener("click", () => {
+  window.open("./README.md", "_blank", "noopener");
 });
 
 focusUrgentBtn.addEventListener("click", () => {
