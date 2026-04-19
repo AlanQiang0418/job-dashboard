@@ -13,8 +13,8 @@
           <div class="hero__topbar">
             <p class="eyebrow">Campus Job Tracker</p>
             <div class="hero__topbar-actions">
-              <button class="ghost-btn ghost-btn--compact" id="restoreDefaultsBtn" type="button">Reset</button>
               <button class="ghost-btn ghost-btn--compact" id="openReadmeBtn" type="button">README</button>
+              <button class="ghost-btn ghost-btn--compact" id="restoreDefaultsBtn" type="button">RESET</button>
             </div>
           </div>
           <h1>求职申请管理看板</h1>
@@ -335,6 +335,15 @@
               <option value="">请选择</option>
             </select>
           </label>
+          <label class="field" id="applicationScheduleField" hidden>
+            <span id="applicationScheduleLabel">笔试日期和时间</span>
+            <div class="schedule-picker">
+              <input name="scheduleDate" id="applicationScheduleDateInput" type="date" disabled />
+              <select name="scheduleTime" id="applicationScheduleTimeSelect" disabled>
+                <option value="">选择时间</option>
+              </select>
+            </div>
+          </label>
           <label class="field">
             <span>联系人</span>
             <input name="contact" type="text" placeholder="例如：校招 HR / 邮箱" />
@@ -406,6 +415,10 @@
               <span>当前状态</span>
               <strong id="drawerBadgeView"></strong>
             </article>
+            <article id="drawerScheduleViewItem" hidden>
+              <span id="drawerScheduleViewLabel">笔试日期和时间</span>
+              <strong id="drawerScheduleView"></strong>
+            </article>
             <article>
               <span>优先级</span>
               <strong id="drawerPriorityView"></strong>
@@ -434,6 +447,15 @@
               <select id="drawerBadgeSelect">
                 <option value="">请选择</option>
               </select>
+            </label>
+            <label class="field" id="drawerScheduleField" hidden>
+              <span id="drawerScheduleLabel">笔试日期和时间</span>
+              <div class="schedule-picker">
+                <input id="drawerScheduleDateInput" type="date" disabled />
+                <select id="drawerScheduleTimeSelect" disabled>
+                  <option value="">选择时间</option>
+                </select>
+              </div>
             </label>
             <label class="field">
               <span>优先级</span>
@@ -483,7 +505,7 @@
     </dialog>
 
     <footer class="site-version" aria-label="Version">
-      <span>v1.6.2</span>
+      <span>v1.7</span>
     </footer>
 
     <script src="./script.js"></script>

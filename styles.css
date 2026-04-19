@@ -1954,6 +1954,13 @@ select {
   outline: none;
 }
 
+.field input:disabled,
+.field select:disabled {
+  color: rgba(31, 31, 26, 0.45);
+  cursor: not-allowed;
+  background: rgba(31, 31, 26, 0.04);
+}
+
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
@@ -1963,6 +1970,18 @@ select {
 
 .field textarea {
   resize: vertical;
+}
+
+.schedule-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(120px, 0.8fr);
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .schedule-picker {
+    grid-template-columns: 1fr;
+  }
 }
 
 .modal__actions {

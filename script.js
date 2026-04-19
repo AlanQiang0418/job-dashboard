@@ -265,6 +265,14 @@ const badgeOptionsByStage = {
   offer: ["待决定", "已接受", "已放弃", "流程终止"]
 };
 
+const schedulableInterviewStatuses = new Set(["待笔试", "待一面", "待二面", "待三面", "待hr面"]);
+const scheduleTimeOptions = Array.from({ length: 48 }, (_, index) => {
+  const minutesFromStart = index * 30;
+  const hour = Math.floor(minutesFromStart / 60);
+  const minute = minutesFromStart % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+});
+
 const stageSortWeight = {
   wishlist: 1,
   applied: 2,
@@ -306,6 +314,10 @@ const applicationDeadlineInput = applicationForm.querySelector('[name="deadline"
 const applicationContactInput = applicationForm.querySelector('[name="contact"]');
 const applicationLinkInput = applicationForm.querySelector('[name="jdLink"]');
 const applicationNextStepInput = applicationForm.querySelector('[name="nextStep"]');
+const applicationScheduleField = document.querySelector("#applicationScheduleField");
+const applicationScheduleLabel = document.querySelector("#applicationScheduleLabel");
+const applicationScheduleDateInput = document.querySelector("#applicationScheduleDateInput");
+const applicationScheduleTimeSelect = document.querySelector("#applicationScheduleTimeSelect");
 const closeModalBtn = document.querySelector("#closeModalBtn");
 const cancelModalBtn = document.querySelector("#cancelModalBtn");
 const focusUrgentBtn = document.querySelector("#focusUrgentBtn");
@@ -326,6 +338,9 @@ const drawerContact = document.querySelector("#drawerContact");
 const drawerLink = document.querySelector("#drawerLink");
 const drawerStage = document.querySelector("#drawerStage");
 const drawerBadgeView = document.querySelector("#drawerBadgeView");
+const drawerScheduleViewItem = document.querySelector("#drawerScheduleViewItem");
+const drawerScheduleViewLabel = document.querySelector("#drawerScheduleViewLabel");
+const drawerScheduleView = document.querySelector("#drawerScheduleView");
 const drawerPriorityView = document.querySelector("#drawerPriorityView");
 const drawerNextStepView = document.querySelector("#drawerNextStepView");
 const drawerNotes = document.querySelector("#drawerNotes");
@@ -334,6 +349,10 @@ const drawerOverviewEdit = document.querySelector("#drawerOverviewEdit");
 const drawerStageSelect = document.querySelector("#drawerStageSelect");
 const drawerDeadlineInput = document.querySelector("#drawerDeadlineInput");
 const drawerBadgeSelect = document.querySelector("#drawerBadgeSelect");
+const drawerScheduleField = document.querySelector("#drawerScheduleField");
+const drawerScheduleLabel = document.querySelector("#drawerScheduleLabel");
+const drawerScheduleDateInput = document.querySelector("#drawerScheduleDateInput");
+const drawerScheduleTimeSelect = document.querySelector("#drawerScheduleTimeSelect");
 const drawerPrioritySelect = document.querySelector("#drawerPrioritySelect");
 const drawerContactInput = document.querySelector("#drawerContactInput");
 const drawerLinkInput = document.querySelector("#drawerLinkInput");
@@ -376,6 +395,8 @@ let visibleWeekStart = null;
 applicationCityInput.removeAttribute("required");
 applicationDeadlineInput.removeAttribute("required");
 applicationNextStepInput.removeAttribute("required");
+applicationScheduleDateInput?.removeAttribute("required");
+applicationScheduleTimeSelect?.removeAttribute("required");
 
 function normalizeOptionalUrl(value) {
   const trimmed = String(value || "").trim();
@@ -383,6 +404,60 @@ function normalizeOptionalUrl(value) {
     return "";
   }
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+function populateScheduleTimeSelect(selectEl) {
+  if (!selectEl || selectEl.options.length > 1) {
+    return;
+  }
+
+  scheduleTimeOptions.forEach((value) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    selectEl.appendChild(option);
+  });
+}
+
+function getScheduleControlValues(value) {
+  const date = parseScheduleDateTime(value);
+  if (!date) {
+    return { date: "", time: "" };
+  }
+
+  const time = `${padCalendarNumber(date.getHours())}:${padCalendarNumber(date.getMinutes())}`;
+  return {
+    date: `${date.getFullYear()}-${padCalendarNumber(date.getMonth() + 1)}-${padCalendarNumber(date.getDate())}`,
+    time: scheduleTimeOptions.includes(time) ? time : ""
+  };
+}
+
+function setScheduleControlsValue(dateInput, timeSelect, value = "") {
+  const values = getScheduleControlValues(value);
+  if (dateInput) {
+    dateInput.value = values.date;
+  }
+  if (timeSelect) {
+    timeSelect.value = values.time;
+  }
+}
+
+function getScheduleFromControls(dateInput, timeSelect) {
+  const dateValue = dateInput?.value || "";
+  const timeValue = timeSelect?.value || "";
+  return dateValue && timeValue ? `${dateValue}T${timeValue}` : "";
+}
+
+function setScheduleControlsEnabled(dateInput, timeSelect, enabled, clearWhenDisabled = true) {
+  if (dateInput) {
+    dateInput.disabled = !enabled;
+  }
+  if (timeSelect) {
+    timeSelect.disabled = !enabled;
+  }
+  if (!enabled && clearWhenDisabled) {
+    setScheduleControlsValue(dateInput, timeSelect);
+  }
 }
 
 function dateInputToDeadline(value) {
@@ -415,6 +490,37 @@ function getDeadlineDate(value) {
     return null;
   }
   return new Date(new Date().getFullYear(), month - 1, day);
+}
+
+function isSchedulableInterviewStatus(stage, badge) {
+  return stage === "interview" && schedulableInterviewStatuses.has(String(badge || "").toLowerCase());
+}
+
+function getScheduleLabelForStatus(badge) {
+  return String(badge || "").includes("笔试") ? "笔试日期和时间" : "面试日期和时间";
+}
+
+function getScheduleEventLabel(badge) {
+  return String(badge || "").includes("笔试") ? "笔试" : "面试";
+}
+
+function parseScheduleDateTime(value) {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) {
+    return null;
+  }
+
+  const date = new Date(rawValue);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatScheduleDisplay(value) {
+  const date = parseScheduleDateTime(value);
+  if (!date) {
+    return "";
+  }
+
+  return `${padCalendarNumber(date.getMonth() + 1)}/${padCalendarNumber(date.getDate())} ${padCalendarNumber(date.getHours())}:${padCalendarNumber(date.getMinutes())}`;
 }
 
 function getDeadlineSortValue(item) {
@@ -467,6 +573,9 @@ function getTimelineCalendarEvents(items) {
     if (!item || !date) {
       return;
     }
+    if (isSchedulableInterviewStatus(item.stage, item.badge) && parseScheduleDateTime(item.scheduleAt)) {
+      return;
+    }
 
     const isExam = entry.title.includes("笔试") || entry.desc.includes("笔试");
     events.push({
@@ -478,6 +587,26 @@ function getTimelineCalendarEvents(items) {
       timeLabel: entry.time,
       title: entry.title,
       desc: entry.desc,
+      applicationId: item.id
+    });
+  });
+
+  items.forEach((item) => {
+    const date = parseScheduleDateTime(item.scheduleAt);
+    if (!date || !isSchedulableInterviewStatus(item.stage, item.badge)) {
+      return;
+    }
+
+    const typeLabel = getScheduleEventLabel(item.badge);
+    events.push({
+      type: "interview",
+      typeLabel,
+      rank: 0,
+      date,
+      dateKey: getCalendarDateKey(date),
+      timeLabel: formatScheduleDisplay(item.scheduleAt),
+      title: `${item.company} ${item.badge}`,
+      desc: item.nextStep || item.role,
       applicationId: item.id
     });
   });
@@ -618,6 +747,7 @@ function ensureApplicationShape(item, index) {
   item.jdLink = item.jdLink || "";
   item.contact = item.contact || "";
   item.notes = item.notes || "";
+  item.scheduleAt = item.scheduleAt || "";
   item.deadline = item.deadline || "TBD";
   item.deadlineLevel = item.deadlineLevel || "mid";
   item.badge = item.badge || (badgeOptionsByStage[item.stage]?.[0] || "");
@@ -858,8 +988,30 @@ function syncApplicationBadgeOptions(resetValue = true) {
   populateStatusSelect(applicationBadgeSelect, applicationStageSelect.value, resetValue ? "" : applicationBadgeSelect.value);
 }
 
+function syncApplicationScheduleField(clearWhenHidden = true) {
+  if (!applicationScheduleField || !applicationScheduleDateInput || !applicationScheduleTimeSelect || !applicationScheduleLabel) {
+    return;
+  }
+
+  const shouldShow = isSchedulableInterviewStatus(applicationStageSelect.value, applicationBadgeSelect.value);
+  applicationScheduleField.hidden = !shouldShow;
+  applicationScheduleLabel.textContent = getScheduleLabelForStatus(applicationBadgeSelect.value);
+  setScheduleControlsEnabled(applicationScheduleDateInput, applicationScheduleTimeSelect, shouldShow, clearWhenHidden);
+}
+
 function syncDrawerBadgeOptions(stage, selectedValue = "") {
   populateStatusSelect(drawerBadgeSelect, stage, selectedValue);
+}
+
+function syncDrawerScheduleField(clearWhenHidden = true) {
+  if (!drawerScheduleField || !drawerScheduleDateInput || !drawerScheduleTimeSelect || !drawerScheduleLabel) {
+    return;
+  }
+
+  const shouldShow = isSchedulableInterviewStatus(drawerStageSelect.value, drawerBadgeSelect.value);
+  drawerScheduleField.hidden = !shouldShow;
+  drawerScheduleLabel.textContent = getScheduleLabelForStatus(drawerBadgeSelect.value);
+  setScheduleControlsEnabled(drawerScheduleDateInput, drawerScheduleTimeSelect, shouldShow, clearWhenHidden);
 }
 
 function getFilterGroups() {
@@ -1728,6 +1880,12 @@ function openDetailsDrawer(applicationId) {
   drawerStage.textContent = item.stageLabel;
   drawerBadgeView.textContent = item.badge || "未设置";
   drawerBadgeView.className = "drawer-pill";
+  const hasSchedule = isSchedulableInterviewStatus(item.stage, item.badge) && parseScheduleDateTime(item.scheduleAt);
+  if (drawerScheduleViewItem && drawerScheduleViewLabel && drawerScheduleView) {
+    drawerScheduleViewItem.hidden = !hasSchedule;
+    drawerScheduleViewLabel.textContent = getScheduleLabelForStatus(item.badge);
+    drawerScheduleView.textContent = hasSchedule ? formatScheduleDisplay(item.scheduleAt) : "";
+  }
   drawerPriorityView.textContent = getPriorityMeta(item).label;
   drawerPriorityView.className = `drawer-pill ${getPriorityDisplayClass(item)}`;
   drawerNextStepView.textContent = item.nextStep || "未填写";
@@ -1736,6 +1894,8 @@ function openDetailsDrawer(applicationId) {
   drawerStageSelect.value = item.stage;
   drawerDeadlineInput.value = deadlineToDateInput(item.deadline);
   syncDrawerBadgeOptions(item.stage, item.badge);
+  setScheduleControlsValue(drawerScheduleDateInput, drawerScheduleTimeSelect, item.scheduleAt || "");
+  syncDrawerScheduleField(false);
   drawerPrioritySelect.value = item.deadlineLevel;
   drawerContactInput.value = item.contact || "";
   drawerLinkInput.value = item.jdLink || "";
@@ -1821,6 +1981,7 @@ function openApplicationModal() {
   applicationForm.reset();
   applicationStageSelect.value = "wishlist";
   syncApplicationBadgeOptions(true);
+  syncApplicationScheduleField();
   applicationModal.showModal();
 }
 
@@ -1829,6 +1990,7 @@ function closeApplicationModal() {
   applicationForm.reset();
   applicationStageSelect.value = "wishlist";
   syncApplicationBadgeOptions(true);
+  syncApplicationScheduleField();
 }
 
 function exportWeeklyReport() {
@@ -1863,10 +2025,20 @@ function shuffleRecommendedJobs() {
 
 applicationStageSelect.addEventListener("change", () => {
   syncApplicationBadgeOptions(true);
+  syncApplicationScheduleField();
+});
+
+applicationBadgeSelect.addEventListener("change", () => {
+  syncApplicationScheduleField();
 });
 
 drawerStageSelect.addEventListener("change", () => {
   syncDrawerBadgeOptions(drawerStageSelect.value, "");
+  syncDrawerScheduleField();
+});
+
+drawerBadgeSelect.addEventListener("change", () => {
+  syncDrawerScheduleField();
 });
 
 addApplicationBtn.addEventListener("click", openApplicationModal);
@@ -1899,6 +2071,9 @@ applicationForm.addEventListener("submit", (event) => {
     deadline: dateInputToDeadline(String(formData.get("deadline"))) || "TBD",
     deadlineLevel: stage === "interview" ? "urgent" : stage === "offer" ? "low" : "mid",
     badge,
+    scheduleAt: isSchedulableInterviewStatus(stage, badge)
+      ? getScheduleFromControls(applicationScheduleDateInput, applicationScheduleTimeSelect)
+      : "",
     nextStep: String(formData.get("nextStep")).trim() || "Add next step",
     channel: "Manual entry",
     jdLink: normalizeOptionalUrl(formData.get("jdLink")),
@@ -2139,6 +2314,9 @@ drawerSaveBtn.addEventListener("click", () => {
   item.stageLabel = getStageLabel(item.stage);
   item.deadline = dateInputToDeadline(drawerDeadlineInput.value) || item.deadline || "TBD";
   item.badge = drawerBadgeSelect.value || item.badge;
+  item.scheduleAt = isSchedulableInterviewStatus(item.stage, item.badge)
+    ? getScheduleFromControls(drawerScheduleDateInput, drawerScheduleTimeSelect)
+    : "";
   item.deadlineLevel = drawerPrioritySelect.value || item.deadlineLevel;
   item.contact = drawerContactInput.value.trim();
   item.jdLink = normalizeOptionalUrl(drawerLinkInput.value);
@@ -2244,7 +2422,10 @@ window.addEventListener("resize", syncWorkspaceColumns);
 
 filterGroup.dataset.applicationFilterGroup = "true";
 searchInput.dataset.applicationSearch = "true";
+populateScheduleTimeSelect(applicationScheduleTimeSelect);
+populateScheduleTimeSelect(drawerScheduleTimeSelect);
 ensureBoardFilterGroup();
 ensureWeekFilterChip();
 syncApplicationBadgeOptions(true);
+syncApplicationScheduleField();
 rerender();
