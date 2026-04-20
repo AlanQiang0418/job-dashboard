@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Tests — 求职申请管理看板</title>
+    <style>
+      body {
+        font-family: "IBM Plex Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+        padding: 24px;
+        max-width: 920px;
+        margin: 0 auto;
+        background: #f6f0e8;
+        color: #1f1f1a;
+      }
+      h1 { margin: 0 0 6px; font-size: 1.4rem; }
+      p.hint { margin: 0 0 14px; color: #6b665f; line-height: 1.55; }
+      .summary {
+        margin: 12px 0 16px;
+        padding: 10px 14px;
+        border-radius: 12px;
+        font-weight: 700;
+      }
+      .summary.pending { background: rgba(31, 31, 26, 0.06); color: #6b665f; }
+      .summary.pass { background: #d8f3ea; color: #14704c; }
+      .summary.fail { background: #fbdcd5; color: #a22815; }
+      ol { padding-left: 22px; line-height: 1.75; margin: 0; }
+      li { padding: 2px 0; }
+      li.pass { color: #14704c; }
+      li.fail { color: #8b2215; }
+      li code {
+        font-family: "SF Mono", Menlo, Consolas, monospace;
+        font-size: 0.86rem;
+        background: rgba(31, 31, 26, 0.06);
+        padding: 1px 6px;
+        border-radius: 4px;
+        color: inherit;
+      }
+      .detail {
+        margin-top: 4px;
+        padding: 6px 10px;
+        background: rgba(206, 76, 57, 0.08);
+        border-radius: 6px;
+        font-family: "SF Mono", Menlo, Consolas, monospace;
+        font-size: 0.82rem;
+      }
+      iframe { display: none; }
+    </style>
+  </head>
+  <body>
+    <h1>求职申请管理看板 — Tests</h1>
+    <p class="hint">
+      直接用浏览器打开本文件即可运行。断言覆盖纯函数、XSS 防护、默认数据渲染。运行期间会临时清空 localStorage，结束后自动还原。
+    </p>
+    <div id="summary" class="summary pending">运行中…</div>
+    <ol id="results"></ol>
+    <iframe id="app" src="./index.html"></iframe>
+
+    <script>
+      (function () {
+        const STORAGE_KEY = "campus-job-tracker-applications-v1";
+        const snapshot = window.localStorage.getItem(STORAGE_KEY);
+        window.localStorage.removeItem(STORAGE_KEY);
+
+        const iframe = document.getElementById("app");
+        const results = document.getElementById("results");
+        const summary = document.getElementById("summary");
+        const cases = [];
+
+        function test(name, fn) {
+          cases.push({ name, fn });
+        }
+
+        function assert(cond, message) {
+          if (!cond) throw new Error(message || "assertion failed");
+        }
+
+        function assertEq(actual, expected, message) {
+          const a = JSON.stringify(actual);
+          const e = JSON.stringify(expected);
+          if (a !== e) {
+            throw new Error(
+              (message || "expected equal") + ": got " + a + ", want " + e
+            );
+          }
+        }
+
+        // --- 纯函数 ---
+
+        test("escapeHtml — 五字符全转义", (w) => {
+          assertEq(w.escapeHtml("<a>&\"'"), "&lt;a&gt;&amp;&quot;&#39;");
+        });
+
+        test("escapeHtml — null / undefined 返回空串", (w) => {
+          assertEq(w.escapeHtml(null), "");
+          assertEq(w.escapeHtml(undefined), "");
+        });
+
+        test("escapeHtml — 拦截 <img onerror> payload", (w) => {
+          const payload = '<img src=x onerror="alert(1)">';
+          const escaped = w.escapeHtml(payload);
+          assert(!escaped.includes("<img"), "原始标签泄漏");
+          assert(escaped.includes("&lt;img"), "尖括号未转义");
+        });
+
+        test("isSchedulableInterviewStatus — 待一面 命中", (w) => {
+          assertEq(w.isSchedulableInterviewStatus("interview", "待一面"), true);
+        });
+
+        test("isSchedulableInterviewStatus — 待HR面（大写）命中", (w) => {
+          // 回归锁: 集合里存的是 "待hr面" 小写，UI 选项是 "待HR面"，
+          // 依赖 toLowerCase 才能匹配。改动常量表时这条会炸。
+          assertEq(w.isSchedulableInterviewStatus("interview", "待HR面"), true);
+        });
+
+        test("isSchedulableInterviewStatus — 面试完成 不命中", (w) => {
+          assertEq(w.isSchedulableInterviewStatus("interview", "面试完成"), false);
+        });
+
+        test("isSchedulableInterviewStatus — 非 interview 阶段不命中", (w) => {
+          assertEq(w.isSchedulableInterviewStatus("applied", "待一面"), false);
+        });
+
+        test("parseScheduleDateTime — 空串返回 null", (w) => {
+          assertEq(w.parseScheduleDateTime(""), null);
+        });
+
+        test("parseScheduleDateTime — 非法字符串返回 null", (w) => {
+          assertEq(w.parseScheduleDateTime("not a date"), null);
+        });
+
+        test("parseScheduleDateTime — 合法 ISO 返回 Date", (w) => {
+          const d = w.parseScheduleDateTime("2026-05-01T10:30");
+          assert(d && typeof d.getTime === "function", "不是 Date 实例");
+          assertEq(d.getHours(), 10);
+          assertEq(d.getMinutes(), 30);
+        });
+
+        test("normalizeOptionalUrl — 空串保持空", (w) => {
+          assertEq(w.normalizeOptionalUrl(""), "");
+        });
+
+        test("normalizeOptionalUrl — 裸域名补 https://", (w) => {
+          assertEq(w.normalizeOptionalUrl("example.com"), "https://example.com");
+        });
+
+        test("normalizeOptionalUrl — http/https 原样保留", (w) => {
+          assertEq(w.normalizeOptionalUrl("http://example.com"), "http://example.com");
+          assertEq(w.normalizeOptionalUrl("https://example.com"), "https://example.com");
+        });
+
+        test("dateInputToDeadline — ISO 日期转 MM/DD", (w) => {
+          assertEq(w.dateInputToDeadline("2026-05-01"), "05/01");
+        });
+
+        test("dateInputToDeadline — 空串返回空串", (w) => {
+          assertEq(w.dateInputToDeadline(""), "");
+        });
+
+        test("ensureApplicationShape — 空对象填充默认值", (w) => {
+          const item = {};
+          w.ensureApplicationShape(item, 99);
+          assertEq(item.id, "app-100");
+          assertEq(item.scheduleAt, "");
+          assert(Array.isArray(item.materials), "materials 未初始化");
+          assert(!!item.deadline, "deadline 缺失");
+          assert(!!item.stageLabel, "stageLabel 缺失");
+        });
+
+        // --- 默认数据渲染冒烟 ---
+
+        test("默认数据渲染出至少一个 job-card", (w) => {
+          const cards = w.document.querySelectorAll(".job-card");
+          assert(cards.length > 0, "期望看到卡片，实际 " + cards.length);
+        });
+
+        test("默认数据渲染出 application 表格行", (w) => {
+          const rows = w.document.querySelectorAll("tr[data-application-id]");
+          assert(rows.length > 0, "期望看到行，实际 " + rows.length);
+        });
+
+        // --- XSS 集成 ---
+
+        test("XSS — 表格中的 company 以纯文本呈现", (w) => {
+          const payload = '<img src=x onerror="window.__xss_table=1">';
+          // applications 是 const, 从 parent 取不到，要用 iframe 自己的作用域
+          w.eval("applications[0].company = " + JSON.stringify(payload) + ";");
+          w.rerender();
+          assert(!w.__xss_table, "onerror 触发 → 转义被绕过");
+          const row = w.document.querySelector("tr[data-application-id]");
+          assert(row && row.textContent.includes(payload), "payload 未以纯文本显示");
+          assert(!row.querySelector("img"), "img 标签被真的插入到了 DOM");
+        });
+
+        test("XSS — 任务中心 nextStep 以纯文本呈现", (w) => {
+          const payload = '<img src=x onerror="window.__xss_task=1">';
+          w.eval(
+            "var _t = applications.find(function (a) { return a.badge === '待完善材料'; });" +
+              "if (_t) { _t.nextStep = " + JSON.stringify(payload) + "; }"
+          );
+          w.rerender();
+          assert(!w.__xss_task, "onerror 触发 → 转义被绕过");
+          const desc = w.document.querySelector(".task-card__desc");
+          assert(desc && desc.textContent.includes(payload), "payload 文本缺失");
+        });
+
+        test("XSS — 推荐岗位 reason 以纯文本呈现", (w) => {
+          const payload = '<img src=x onerror="window.__xss_rec=1">';
+          w.eval(
+            "recommendedJobs[0].reason = " + JSON.stringify(payload) + ";"
+          );
+          w.rerender();
+          assert(!w.__xss_rec, "onerror 触发 → 转义被绕过");
+          const desc = w.document.querySelector(".recommended-item__desc");
+          assert(desc && desc.textContent.includes(payload), "payload 文本缺失");
+        });
+
+        // --- runner ---
+
+        function renderResult(name, ok, detail) {
+          const li = document.createElement("li");
+          li.className = ok ? "pass" : "fail";
+          const mark = document.createElement("span");
+          mark.textContent = ok ? "✓ " : "✗ ";
+          li.appendChild(mark);
+          const code = document.createElement("code");
+          code.textContent = name;
+          li.appendChild(code);
+          if (!ok && detail) {
+            const div = document.createElement("div");
+            div.className = "detail";
+            div.textContent = detail;
+            li.appendChild(div);
+          }
+          results.appendChild(li);
+        }
+
+        function run(w) {
+          let passed = 0;
+          let failed = 0;
+          cases.forEach(({ name, fn }) => {
+            try {
+              fn(w);
+              passed += 1;
+              renderResult(name, true);
+            } catch (error) {
+              failed += 1;
+              renderResult(name, false, (error && error.message) || String(error));
+            }
+          });
+
+          summary.classList.remove("pending");
+          summary.classList.add(failed === 0 ? "pass" : "fail");
+          summary.textContent = passed + " passed · " + failed + " failed";
+
+          if (snapshot !== null) {
+            window.localStorage.setItem(STORAGE_KEY, snapshot);
+          } else {
+            window.localStorage.removeItem(STORAGE_KEY);
+          }
+        }
+
+        iframe.addEventListener("load", () => {
+          setTimeout(() => run(iframe.contentWindow), 0);
+        });
+      })();
+    </script>
+  </body>
+</html>

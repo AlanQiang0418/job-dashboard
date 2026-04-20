@@ -406,6 +406,15 @@ function normalizeOptionalUrl(value) {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function populateScheduleTimeSelect(selectEl) {
   if (!selectEl || selectEl.options.length > 1) {
     return;
@@ -1306,11 +1315,11 @@ function renderTaskCenter(items) {
     article.innerHTML = `
       <span class="task-card__rank">${index + 1}</span>
       <div class="task-card__meta">
-        <span class="task-card__type ${task.statusClass}">${task.statusLabel}</span>
-        <h3 class="task-card__title">${task.title}</h3>
-        <p class="task-card__desc">${task.desc}</p>
+        <span class="task-card__type ${escapeHtml(task.statusClass)}">${escapeHtml(task.statusLabel)}</span>
+        <h3 class="task-card__title">${escapeHtml(task.title)}</h3>
+        <p class="task-card__desc">${escapeHtml(task.desc)}</p>
       </div>
-      <button class="task-card__action" data-task-action="open-detail" data-application-id="${task.applicationId}" type="button">${task.actionLabel}</button>
+      <button class="task-card__action" data-task-action="open-detail" data-application-id="${escapeHtml(task.applicationId)}" type="button">${escapeHtml(task.actionLabel)}</button>
     `;
     taskList.appendChild(article);
   });
@@ -1407,24 +1416,24 @@ function renderTable(items) {
     const tr = document.createElement("tr");
     tr.dataset.applicationId = item.id;
     tr.innerHTML = `
-      <td class="table-company">${item.company}</td>
+      <td class="table-company">${escapeHtml(item.company)}</td>
       <td class="table-role">
-        <strong>${item.role}</strong>
-        <span>${item.city || "TBD"}</span>
+        <strong>${escapeHtml(item.role)}</strong>
+        <span>${escapeHtml(item.city || "TBD")}</span>
       </td>
       <td class="table-due">
-        <strong>${item.deadline}</strong>
+        <strong>${escapeHtml(item.deadline)}</strong>
         <span>${item.deadlineLevel === "urgent" ? "48 小时内需要处理" : "本周持续跟进"}</span>
       </td>
       <td>
-        <span class="table-status ${item.stage}">${item.stageLabel}</span>
+        <span class="table-status ${escapeHtml(item.stage)}">${escapeHtml(item.stageLabel)}</span>
       </td>
       <td class="table-next">
-        <strong>${item.badge}</strong>
-        <span>${item.nextStep}</span>
+        <strong>${escapeHtml(item.badge)}</strong>
+        <span>${escapeHtml(item.nextStep)}</span>
       </td>
       <td>
-        <span class="table-priority ${priority.className}">${priority.label}</span>
+        <span class="table-priority ${escapeHtml(priority.className)}">${escapeHtml(priority.label)}</span>
       </td>
     `;
     tableBody.appendChild(tr);
@@ -1823,16 +1832,16 @@ function renderRecommended() {
     article.innerHTML = `
       <div class="recommended-item__top">
         <div>
-          <span class="recommended-item__match">${job.match}</span>
-          <h3 class="recommended-item__title">${job.company} · ${job.role}</h3>
+          <span class="recommended-item__match">${escapeHtml(job.match)}</span>
+          <h3 class="recommended-item__title">${escapeHtml(job.company)} · ${escapeHtml(job.role)}</h3>
         </div>
       </div>
-      <p class="recommended-item__desc">${job.reason}</p>
+      <p class="recommended-item__desc">${escapeHtml(job.reason)}</p>
       <div class="recommended-item__meta">
-        <span>${job.city}</span>
-        <span>截止 ${job.deadline}</span>
+        <span>${escapeHtml(job.city)}</span>
+        <span>截止 ${escapeHtml(job.deadline)}</span>
       </div>
-      <button class="recommended-action" data-recommended-id="${job.id}" type="button">${exists ? "已加入待投递" : "加入待投递"}</button>
+      <button class="recommended-action" data-recommended-id="${escapeHtml(job.id)}" type="button">${exists ? "已加入待投递" : "加入待投递"}</button>
     `;
     const button = article.querySelector(".recommended-action");
     button.disabled = exists;
@@ -1859,10 +1868,10 @@ function openDetailsDrawer(applicationId) {
   isDrawerEditMode = false;
   drawerTitle.textContent = `${item.company} · ${item.role}`;
   drawerMeta.innerHTML = `
-    <span class="meta-pill ${getPriorityDisplayClass(item)}">${getPriorityMeta(item).label}</span>
-    <span>${item.city || "TBD"}</span>
-    <span>${item.deadline === "TBD" ? "截止 TBD" : `截止 ${item.deadline}`}</span>
-    <span class="meta-pill">${item.badge || "未设置"}</span>
+    <span class="meta-pill ${escapeHtml(getPriorityDisplayClass(item))}">${escapeHtml(getPriorityMeta(item).label)}</span>
+    <span>${escapeHtml(item.city || "TBD")}</span>
+    <span>${item.deadline === "TBD" ? "截止 TBD" : `截止 ${escapeHtml(item.deadline)}`}</span>
+    <span class="meta-pill">${escapeHtml(item.badge || "未设置")}</span>
   `;
   drawerChannel.textContent = item.channel || "未填写";
   drawerContact.textContent = item.contact || "未填写";

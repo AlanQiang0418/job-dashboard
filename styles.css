@@ -543,11 +543,6 @@ select {
   background: rgba(206, 76, 57, 0.12);
 }
 
-.task-card__type.interview {
-  color: var(--coral);
-  background: rgba(242, 111, 77, 0.13);
-}
-
 .task-card__type.followup {
   color: #93671f;
   background: rgba(204, 146, 50, 0.13);
@@ -1197,24 +1192,6 @@ select {
 }
 
 .job-card__priority.is-high,
-.drawer-pill.is-high {
-  color: var(--danger);
-  background: rgba(206, 76, 57, 0.12);
-}
-
-.job-card__priority.is-mid,
-.drawer-pill.is-mid {
-  color: #93671f;
-  background: rgba(204, 146, 50, 0.13);
-}
-
-.job-card__priority.is-low,
-.drawer-pill.is-low {
-  color: var(--mint);
-  background: rgba(30, 156, 132, 0.12);
-}
-
-.job-card__priority.is-high,
 .meta-pill.is-high,
 .drawer-pill.is-high {
   color: var(--danger);
@@ -1543,7 +1520,7 @@ select {
 }
 
 .timeline-day--interview .timeline-day__date {
-  color: var(--accent-coral);
+  color: var(--coral);
 }
 
 .timeline-day__count {
@@ -1565,7 +1542,7 @@ select {
 }
 
 .timeline-day__dot--interview {
-  background: var(--accent-coral);
+  background: var(--coral);
 }
 
 .timeline-day__dot--deadline {
@@ -1688,7 +1665,7 @@ select {
 }
 
 .timeline-tooltip__kind--interview {
-  color: var(--accent-coral);
+  color: var(--coral);
   background: rgba(242, 111, 77, 0.12);
 }
 
@@ -2076,10 +2053,6 @@ select {
   display: none;
 }
 
-.drawer__head-actions .ghost-btn[hidden] {
-  display: none;
-}
-
 .drawer__close {
   width: 38px;
   height: 38px;
@@ -2130,13 +2103,6 @@ select {
 .drawer__overview strong {
   display: block;
   margin-top: 8px;
-}
-
-.drawer__overview .drawer-pill {
-  display: inline-flex;
-  margin-top: 8px;
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
 }
 
 .drawer__overview .drawer-pill {
@@ -2374,7 +2340,7 @@ select {
     height: 20px;
     border-radius: 50%;
     background: rgba(55, 104, 255, 0.1);
-    color: var(--accent-blue);
+    color: var(--blue);
     font-size: 0.9rem;
     font-weight: 700;
     flex-shrink: 0;
